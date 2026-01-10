@@ -914,6 +914,26 @@ impl Isolate {
     OwnedIsolate::new(Self::new_impl(params))
   }
 
+  /// Creates a new isolate that does not automatically enter/exit.
+  ///
+  /// This is designed for use with `v8::Locker` in multi-threaded scenarios.
+  /// Unlike `Isolate::new()` which returns an `OwnedIsolate` that automatically
+  /// enters on creation and exits on drop, this returns an `UnenteredIsolate`
+  /// that requires manual entry management via `v8::Locker`.
+  ///
+  /// # Example
+  /// ```ignore
+  /// let isolate = v8::Isolate::new_unentered(params);
+  /// let locker = v8::Locker::new(&*isolate);
+  /// // Use isolate...
+  /// ```
+  ///
+  /// V8::initialize() must have run prior to this.
+  #[allow(clippy::new_ret_no_self)]
+  pub fn new_unentered(params: CreateParams) -> UnenteredIsolate {
+    UnenteredIsolate::new(Self::new_impl(params))
+  }
+
   #[allow(clippy::new_ret_no_self)]
   pub fn snapshot_creator(
     external_references: Option<Cow<'static, [ExternalReference]>>,
@@ -2118,6 +2138,79 @@ impl AsMut<Isolate> for Isolate {
   }
 }
 
+/// An isolate that does not automatically enter/exit, designed for use with v8::Locker.
+///
+/// Unlike `OwnedIsolate` which automatically calls `enter()` on creation and `exit()` on drop,
+/// `UnenteredIsolate` requires manual entry management via `v8::Locker`.
+///
+/// This is useful for multi-threaded scenarios where isolates are shared across threads
+/// using the Locker pattern, as automatic enter/exit conflicts with Locker semantics.
+///
+/// # Example
+/// ```ignore
+/// use v8::{Isolate, UnenteredIsolate, Locker};
+///
+/// // Create isolate without entering
+/// let isolate = Isolate::new_unentered(params);
+///
+/// // Lock and enter on current thread
+/// let locker = Locker::new(&*isolate);
+///
+/// // Use isolate...
+///
+/// // Locker drop unlocks, isolate drop disposes (no exit call)
+/// ```
+#[derive(Debug)]
+pub struct UnenteredIsolate {
+  cxx_isolate: NonNull<RealIsolate>,
+}
+
+impl UnenteredIsolate {
+  pub(crate) fn new(cxx_isolate: *mut RealIsolate) -> Self {
+    let cxx_isolate = NonNull::new(cxx_isolate).unwrap();
+    Self { cxx_isolate }
+  }
+}
+
+impl Drop for UnenteredIsolate {
+  fn drop(&mut self) {
+    unsafe {
+      let snapshot_creator = self.get_annex_mut().maybe_snapshot_creator.take();
+      assert!(
+        snapshot_creator.is_none(),
+        "If isolate was created using v8::Isolate::snapshot_creator, you should use v8::UnenteredIsolate::create_blob before dropping an isolate."
+      );
+
+      // Unlike OwnedIsolate, we don't call exit() here as the isolate
+      // was never entered (or was entered/exited via Locker).
+      // We also don't assert on GetCurrent() since Locker manages entry.
+
+      self.dispose_annex();
+      Platform::notify_isolate_shutdown(&get_current_platform(), self);
+      self.dispose();
+    }
+  }
+}
+
+impl Deref for UnenteredIsolate {
+  type Target = Isolate;
+  fn deref(&self) -> &Self::Target {
+    unsafe { &*(self.cxx_isolate.as_ptr() as *const Isolate) }
+  }
+}
+
+impl DerefMut for UnenteredIsolate {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    unsafe { &mut *(self.cxx_isolate.as_ptr() as *mut Isolate) }
+  }
+}
+
+impl AsMut<Isolate> for UnenteredIsolate {
+  fn as_mut(&mut self) -> &mut Isolate {
+    self
+  }
+}
+
 /// Collection of V8 heap information.
 ///
 /// Instances of this class can be passed to v8::Isolate::GetHeapStatistics to
@@ -2415,5 +2508,77 @@ impl AsRef<Isolate> for OwnedIsolate {
 impl AsRef<Isolate> for Isolate {
   fn as_ref(&self) -> &Isolate {
     self
+  }
+}
+
+/// A stack-allocated class that governs exclusive access to an isolate.
+///
+/// Locks V8 in a given thread. All threads writing to a single isolate must
+/// use a `Locker` to ensure thread-safe access.
+///
+/// The isolate is automatically unlocked when the `Locker` goes out of scope.
+pub struct Locker {
+  _raw: crate::scope::raw::Locker,
+  _no_send: std::marker::PhantomData<*mut ()>,
+}
+
+impl Locker {
+  /// Initialize Locker for a given Isolate.
+  pub fn new(isolate: &Isolate) -> Self {
+    let mut raw = unsafe { crate::scope::raw::Locker::uninit() };
+    let isolate_ptr = NonNull::new(isolate as *const Isolate as *mut Isolate)
+      .unwrap()
+      .cast::<RealIsolate>();
+
+    unsafe {
+      raw.init(isolate_ptr);
+    }
+
+    Self {
+      _raw: raw,
+      _no_send: std::marker::PhantomData,
+    }
+  }
+
+  /// Returns whether or not the locker for a given isolate is locked by the
+  /// current thread.
+  pub fn is_locked(isolate: &Isolate) -> bool {
+    let isolate_ptr = NonNull::new(isolate as *const Isolate as *mut Isolate)
+      .unwrap()
+      .cast::<RealIsolate>();
+
+    crate::scope::raw::Locker::is_locked(isolate_ptr)
+  }
+}
+
+/// A stack-allocated class that temporarily unlocks an isolate.
+///
+/// An Unlocker may be used to temporarily release the lock on an isolate,
+/// allowing other threads to access it. This is useful for long-running
+/// operations where you want to yield control to other threads.
+///
+/// An Unlocker can only be used within the scope of a `Locker` and will
+/// restore the lock when it goes out of scope.
+pub struct Unlocker {
+  _raw: crate::scope::raw::Unlocker,
+  _no_send: std::marker::PhantomData<*mut ()>,
+}
+
+impl Unlocker {
+  /// Initialize Unlocker for a given Isolate.
+  pub fn new(isolate: &Isolate) -> Self {
+    let mut raw = unsafe { crate::scope::raw::Unlocker::uninit() };
+    let isolate_ptr = NonNull::new(isolate as *const Isolate as *mut Isolate)
+      .unwrap()
+      .cast::<RealIsolate>();
+
+    unsafe {
+      raw.init(isolate_ptr);
+    }
+
+    Self {
+      _raw: raw,
+      _no_send: std::marker::PhantomData,
+    }
   }
 }
