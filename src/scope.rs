@@ -128,8 +128,8 @@
 use crate::{
   Context, Data, DataError, Function, FunctionCallbackInfo, Isolate, Local,
   Message, Object, OwnedIsolate, PromiseRejectMessage, PropertyCallbackInfo,
-  SealedLocal, Value, fast_api::FastApiCallbackOptions, isolate::RealIsolate,
-  support::assert_layout_subset,
+  SealedLocal, UnenteredIsolate, Value, fast_api::FastApiCallbackOptions,
+  isolate::RealIsolate, support::assert_layout_subset,
 };
 use std::{
   any::type_name,
@@ -429,6 +429,20 @@ impl<'s> NewHandleScope<'s> for Isolate {
 }
 
 impl<'s> NewHandleScope<'s> for OwnedIsolate {
+  type NewScope = HandleScope<'s, ()>;
+
+  fn make_new_scope(me: &'s mut Self) -> Self::NewScope {
+    HandleScope {
+      raw_handle_scope: unsafe { raw::HandleScope::uninit() },
+      isolate: unsafe { NonNull::new_unchecked(me.get_isolate_ptr()) },
+      context: Cell::new(None),
+      _phantom: PhantomData,
+      _pinned: PhantomPinned,
+    }
+  }
+}
+
+impl<'s> NewHandleScope<'s> for UnenteredIsolate {
   type NewScope = HandleScope<'s, ()>;
 
   fn make_new_scope(me: &'s mut Self) -> Self::NewScope {
