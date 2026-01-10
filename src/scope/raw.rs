@@ -219,6 +219,82 @@ impl Drop for AllowJavascriptExecutionScope {
   }
 }
 
+#[repr(C)]
+#[derive(Debug)]
+pub(super) struct Locker([MaybeUninit<usize>; 2]);
+
+impl Locker {
+  /// Creates an uninitialized `Locker`.
+  ///
+  /// This function is marked unsafe because the caller must ensure that the
+  /// returned value isn't dropped before `init()` has been called.
+  #[inline]
+  pub unsafe fn uninit() -> Self {
+    Self(unsafe { MaybeUninit::uninit().assume_init() })
+  }
+
+  /// This function is marked unsafe because `init()` must be called exactly
+  /// once, no more and no less, after creating a `Locker` value with
+  /// `Locker::uninit()`.
+  #[inline]
+  pub unsafe fn init(&mut self, isolate: NonNull<RealIsolate>) {
+    let buf = NonNull::from(self).cast();
+    unsafe {
+      v8__Locker__CONSTRUCT(buf.as_ptr(), isolate.as_ptr());
+    }
+  }
+
+  /// Check if the isolate is locked by any thread.
+  pub fn is_locked(isolate: NonNull<RealIsolate>) -> bool {
+    unsafe { v8__Locker__IsLocked(isolate.as_ptr()) }
+  }
+
+  /// Check if any locker is currently active.
+  pub fn is_active() -> bool {
+    unsafe { v8__Locker__IsActive() }
+  }
+}
+
+impl Drop for Locker {
+  #[inline(always)]
+  fn drop(&mut self) {
+    unsafe { v8__Locker__DESTRUCT(self) };
+  }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub(super) struct Unlocker([MaybeUninit<usize>; 2]);
+
+impl Unlocker {
+  /// Creates an uninitialized `Unlocker`.
+  ///
+  /// This function is marked unsafe because the caller must ensure that the
+  /// returned value isn't dropped before `init()` has been called.
+  #[inline]
+  pub unsafe fn uninit() -> Self {
+    Self(unsafe { MaybeUninit::uninit().assume_init() })
+  }
+
+  /// This function is marked unsafe because `init()` must be called exactly
+  /// once, no more and no less, after creating an `Unlocker` value with
+  /// `Unlocker::uninit()`.
+  #[inline]
+  pub unsafe fn init(&mut self, isolate: NonNull<RealIsolate>) {
+    let buf = NonNull::from(self).cast();
+    unsafe {
+      v8__Unlocker__CONSTRUCT(buf.as_ptr(), isolate.as_ptr());
+    }
+  }
+}
+
+impl Drop for Unlocker {
+  #[inline(always)]
+  fn drop(&mut self) {
+    unsafe { v8__Unlocker__DESTRUCT(self) };
+  }
+}
+
 unsafe extern "C" {
   pub(super) fn v8__Isolate__GetCurrent() -> *mut RealIsolate;
   pub(super) fn v8__Isolate__GetCurrentContext(
@@ -311,4 +387,18 @@ unsafe extern "C" {
   pub(super) fn v8__AllowJavascriptExecutionScope__DESTRUCT(
     this: *mut AllowJavascriptExecutionScope,
   );
+
+  pub(super) fn v8__Locker__CONSTRUCT(
+    buf: *mut MaybeUninit<Locker>,
+    isolate: *mut RealIsolate,
+  );
+  pub(super) fn v8__Locker__DESTRUCT(this: *mut Locker);
+  pub(super) fn v8__Locker__IsActive() -> bool;
+  pub(super) fn v8__Locker__IsLocked(isolate: *mut RealIsolate) -> bool;
+
+  pub(super) fn v8__Unlocker__CONSTRUCT(
+    buf: *mut MaybeUninit<Unlocker>,
+    isolate: *mut RealIsolate,
+  );
+  pub(super) fn v8__Unlocker__DESTRUCT(this: *mut Unlocker);
 }

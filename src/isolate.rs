@@ -2417,3 +2417,80 @@ impl AsRef<Isolate> for Isolate {
     self
   }
 }
+
+/// A stack-allocated class that governs exclusive access to an isolate.
+///
+/// Locks V8 in a given thread. All threads writing to a single isolate must
+/// use a `Locker` to ensure thread-safe access.
+///
+/// The isolate is automatically unlocked when the `Locker` goes out of scope.
+pub struct Locker {
+  raw: crate::scope::raw::Locker,
+  _no_send: std::marker::PhantomData<*mut ()>,
+}
+
+impl Locker {
+  /// Initialize Locker for a given Isolate.
+  pub fn new(isolate: &Isolate) -> Self {
+    let mut raw = unsafe { crate::scope::raw::Locker::uninit() };
+    let isolate_ptr = NonNull::new(isolate as *const Isolate as *mut Isolate)
+      .unwrap()
+      .cast::<RealIsolate>();
+
+    unsafe {
+      raw.init(isolate_ptr);
+    }
+
+    Self {
+      raw,
+      _no_send: std::marker::PhantomData,
+    }
+  }
+
+  /// Returns whether or not the locker for a given isolate is locked by the
+  /// current thread.
+  pub fn is_locked(isolate: &Isolate) -> bool {
+    let isolate_ptr = NonNull::new(isolate as *const Isolate as *mut Isolate)
+      .unwrap()
+      .cast::<RealIsolate>();
+
+    crate::scope::raw::Locker::is_locked(isolate_ptr)
+  }
+
+  /// Returns whether v8::Locker is being used by this V8 instance.
+  pub fn is_active() -> bool {
+    crate::scope::raw::Locker::is_active()
+  }
+}
+
+/// A stack-allocated class that temporarily unlocks an isolate.
+///
+/// An Unlocker may be used to temporarily release the lock on an isolate,
+/// allowing other threads to access it. This is useful for long-running
+/// operations where you want to yield control to other threads.
+///
+/// An Unlocker can only be used within the scope of a `Locker` and will
+/// restore the lock when it goes out of scope.
+pub struct Unlocker {
+  raw: crate::scope::raw::Unlocker,
+  _no_send: std::marker::PhantomData<*mut ()>,
+}
+
+impl Unlocker {
+  /// Initialize Unlocker for a given Isolate.
+  pub fn new(isolate: &Isolate) -> Self {
+    let mut raw = unsafe { crate::scope::raw::Unlocker::uninit() };
+    let isolate_ptr = NonNull::new(isolate as *const Isolate as *mut Isolate)
+      .unwrap()
+      .cast::<RealIsolate>();
+
+    unsafe {
+      raw.init(isolate_ptr);
+    }
+
+    Self {
+      raw,
+      _no_send: std::marker::PhantomData,
+    }
+  }
+}
