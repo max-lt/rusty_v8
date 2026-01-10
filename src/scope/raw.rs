@@ -221,7 +221,7 @@ impl Drop for AllowJavascriptExecutionScope {
 
 #[repr(C)]
 #[derive(Debug)]
-pub(super) struct Locker([MaybeUninit<usize>; 2]);
+pub(crate) struct Locker([MaybeUninit<usize>; 2]);
 
 impl Locker {
   /// Creates an uninitialized `Locker`.
@@ -264,7 +264,7 @@ impl Drop for Locker {
 
 #[repr(C)]
 #[derive(Debug)]
-pub(super) struct Unlocker([MaybeUninit<usize>; 2]);
+pub(crate) struct Unlocker([MaybeUninit<usize>; 2]);
 
 impl Unlocker {
   /// Creates an uninitialized `Unlocker`.
