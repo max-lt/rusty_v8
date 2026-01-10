@@ -2518,7 +2518,7 @@ impl AsRef<Isolate> for Isolate {
 ///
 /// The isolate is automatically unlocked when the `Locker` goes out of scope.
 pub struct Locker {
-  raw: crate::scope::raw::Locker,
+  _raw: crate::scope::raw::Locker,
   _no_send: std::marker::PhantomData<*mut ()>,
 }
 
@@ -2565,7 +2565,7 @@ impl Locker {
 /// An Unlocker can only be used within the scope of a `Locker` and will
 /// restore the lock when it goes out of scope.
 pub struct Unlocker {
-  raw: crate::scope::raw::Unlocker,
+  _raw: crate::scope::raw::Unlocker,
   _no_send: std::marker::PhantomData<*mut ()>,
 }
 
@@ -2582,7 +2582,7 @@ impl Unlocker {
     }
 
     Self {
-      raw,
+      _raw: raw,
       _no_send: std::marker::PhantomData,
     }
   }
