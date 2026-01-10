@@ -914,6 +914,26 @@ impl Isolate {
     OwnedIsolate::new(Self::new_impl(params))
   }
 
+  /// Creates a new isolate that does not automatically enter/exit.
+  ///
+  /// This is designed for use with `v8::Locker` in multi-threaded scenarios.
+  /// Unlike `Isolate::new()` which returns an `OwnedIsolate` that automatically
+  /// enters on creation and exits on drop, this returns an `UnenteredIsolate`
+  /// that requires manual entry management via `v8::Locker`.
+  ///
+  /// # Example
+  /// ```ignore
+  /// let isolate = v8::Isolate::new_unentered(params);
+  /// let locker = v8::Locker::new(&*isolate);
+  /// // Use isolate...
+  /// ```
+  ///
+  /// V8::initialize() must have run prior to this.
+  #[allow(clippy::new_ret_no_self)]
+  pub fn new_unentered(params: CreateParams) -> UnenteredIsolate {
+    UnenteredIsolate::new(Self::new_impl(params))
+  }
+
   #[allow(clippy::new_ret_no_self)]
   pub fn snapshot_creator(
     external_references: Option<Cow<'static, [ExternalReference]>>,
@@ -2113,6 +2133,79 @@ impl AsMut<Isolate> for OwnedIsolate {
 }
 
 impl AsMut<Isolate> for Isolate {
+  fn as_mut(&mut self) -> &mut Isolate {
+    self
+  }
+}
+
+/// An isolate that does not automatically enter/exit, designed for use with v8::Locker.
+///
+/// Unlike `OwnedIsolate` which automatically calls `enter()` on creation and `exit()` on drop,
+/// `UnenteredIsolate` requires manual entry management via `v8::Locker`.
+///
+/// This is useful for multi-threaded scenarios where isolates are shared across threads
+/// using the Locker pattern, as automatic enter/exit conflicts with Locker semantics.
+///
+/// # Example
+/// ```ignore
+/// use v8::{Isolate, UnenteredIsolate, Locker};
+///
+/// // Create isolate without entering
+/// let isolate = Isolate::new_unentered(params);
+///
+/// // Lock and enter on current thread
+/// let locker = Locker::new(&*isolate);
+///
+/// // Use isolate...
+///
+/// // Locker drop unlocks, isolate drop disposes (no exit call)
+/// ```
+#[derive(Debug)]
+pub struct UnenteredIsolate {
+  cxx_isolate: NonNull<RealIsolate>,
+}
+
+impl UnenteredIsolate {
+  pub(crate) fn new(cxx_isolate: *mut RealIsolate) -> Self {
+    let cxx_isolate = NonNull::new(cxx_isolate).unwrap();
+    Self { cxx_isolate }
+  }
+}
+
+impl Drop for UnenteredIsolate {
+  fn drop(&mut self) {
+    unsafe {
+      let snapshot_creator = self.get_annex_mut().maybe_snapshot_creator.take();
+      assert!(
+        snapshot_creator.is_none(),
+        "If isolate was created using v8::Isolate::snapshot_creator, you should use v8::UnenteredIsolate::create_blob before dropping an isolate."
+      );
+
+      // Unlike OwnedIsolate, we don't call exit() here as the isolate
+      // was never entered (or was entered/exited via Locker).
+      // We also don't assert on GetCurrent() since Locker manages entry.
+
+      self.dispose_annex();
+      Platform::notify_isolate_shutdown(&get_current_platform(), self);
+      self.dispose();
+    }
+  }
+}
+
+impl Deref for UnenteredIsolate {
+  type Target = Isolate;
+  fn deref(&self) -> &Self::Target {
+    unsafe { &*(self.cxx_isolate.as_ptr() as *const Isolate) }
+  }
+}
+
+impl DerefMut for UnenteredIsolate {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    unsafe { &mut *(self.cxx_isolate.as_ptr() as *mut Isolate) }
+  }
+}
+
+impl AsMut<Isolate> for UnenteredIsolate {
   fn as_mut(&mut self) -> &mut Isolate {
     self
   }
