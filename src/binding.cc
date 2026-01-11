@@ -170,6 +170,10 @@ void v8__Isolate__Enter(v8::Isolate* isolate) { isolate->Enter(); }
 
 void v8__Isolate__Exit(v8::Isolate* isolate) { isolate->Exit(); }
 
+// Expose the size of v8::Locker so Rust doesn't have to hardcode it.
+// This ensures we don't have buffer overflows if V8 changes the struct size.
+size_t v8__Locker__SIZEOF() { return sizeof(v8::Locker); }
+
 void v8__Locker__CONSTRUCT(uninit_t<v8::Locker>* buf, v8::Isolate* isolate) {
   construct_in_place<v8::Locker>(buf, isolate);
 }
@@ -179,13 +183,6 @@ void v8__Locker__DESTRUCT(v8::Locker* self) { self->~Locker(); }
 bool v8__Locker__IsLocked(v8::Isolate* isolate) {
   return v8::Locker::IsLocked(isolate);
 }
-
-void v8__Unlocker__CONSTRUCT(uninit_t<v8::Unlocker>* buf,
-                             v8::Isolate* isolate) {
-  construct_in_place<v8::Unlocker>(buf, isolate);
-}
-
-void v8__Unlocker__DESTRUCT(v8::Unlocker* self) { self->~Unlocker(); }
 
 v8::Isolate* v8__Isolate__GetCurrent() { return v8::Isolate::GetCurrent(); }
 

@@ -130,7 +130,6 @@ pub use isolate::PromiseRejectCallback;
 pub use isolate::RealIsolate;
 pub use isolate::TimeZoneDetection;
 pub use isolate::UnenteredIsolate;
-pub use isolate::Unlocker;
 pub use isolate::UseCounterCallback;
 pub use isolate::UseCounterFeature;
 pub use isolate::WasmAsyncSuccess;

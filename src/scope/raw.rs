@@ -219,25 +219,41 @@ impl Drop for AllowJavascriptExecutionScope {
   }
 }
 
+// Buffer size for v8::Locker - must be at least sizeof(v8::Locker).
+// We use 24 bytes which is conservative for most platforms.
+// The actual size is verified at runtime in Locker::init().
+const LOCKER_BUFFER_SIZE: usize = 24;
+
 #[repr(C)]
 #[derive(Debug)]
-pub(crate) struct Locker([MaybeUninit<usize>; 2]);
+pub(crate) struct Locker([MaybeUninit<u8>; LOCKER_BUFFER_SIZE]);
 
 impl Locker {
   /// Creates an uninitialized `Locker`.
   ///
-  /// This function is marked unsafe because the caller must ensure that the
-  /// returned value isn't dropped before `init()` has been called.
+  /// # Safety
+  /// The caller must ensure that `init()` is called before the Locker is used
+  /// or dropped.
   #[inline]
   pub unsafe fn uninit() -> Self {
     Self(unsafe { MaybeUninit::uninit().assume_init() })
   }
 
-  /// This function is marked unsafe because `init()` must be called exactly
-  /// once, no more and no less, after creating a `Locker` value with
-  /// `Locker::uninit()`.
+  /// Initialize the Locker for the given isolate.
+  ///
+  /// # Safety
+  /// Must be called exactly once after `uninit()`.
   #[inline]
   pub unsafe fn init(&mut self, isolate: NonNull<RealIsolate>) {
+    // Verify at runtime that our buffer is large enough
+    let actual_size = unsafe { v8__Locker__SIZEOF() };
+    assert!(
+      LOCKER_BUFFER_SIZE >= actual_size,
+      "Locker buffer too small: {} < {}. Please update LOCKER_BUFFER_SIZE.",
+      LOCKER_BUFFER_SIZE,
+      actual_size
+    );
+
     let buf = NonNull::from(self).cast();
     unsafe {
       v8__Locker__CONSTRUCT(buf.as_ptr(), isolate.as_ptr());
@@ -254,39 +270,6 @@ impl Drop for Locker {
   #[inline(always)]
   fn drop(&mut self) {
     unsafe { v8__Locker__DESTRUCT(self) };
-  }
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub(crate) struct Unlocker([MaybeUninit<usize>; 2]);
-
-impl Unlocker {
-  /// Creates an uninitialized `Unlocker`.
-  ///
-  /// This function is marked unsafe because the caller must ensure that the
-  /// returned value isn't dropped before `init()` has been called.
-  #[inline]
-  pub unsafe fn uninit() -> Self {
-    Self(unsafe { MaybeUninit::uninit().assume_init() })
-  }
-
-  /// This function is marked unsafe because `init()` must be called exactly
-  /// once, no more and no less, after creating an `Unlocker` value with
-  /// `Unlocker::uninit()`.
-  #[inline]
-  pub unsafe fn init(&mut self, isolate: NonNull<RealIsolate>) {
-    let buf = NonNull::from(self).cast();
-    unsafe {
-      v8__Unlocker__CONSTRUCT(buf.as_ptr(), isolate.as_ptr());
-    }
-  }
-}
-
-impl Drop for Unlocker {
-  #[inline(always)]
-  fn drop(&mut self) {
-    unsafe { v8__Unlocker__DESTRUCT(self) };
   }
 }
 
@@ -383,16 +366,11 @@ unsafe extern "C" {
     this: *mut AllowJavascriptExecutionScope,
   );
 
+  pub(super) fn v8__Locker__SIZEOF() -> usize;
   pub(super) fn v8__Locker__CONSTRUCT(
     buf: *mut MaybeUninit<Locker>,
     isolate: *mut RealIsolate,
   );
   pub(super) fn v8__Locker__DESTRUCT(this: *mut Locker);
   pub(super) fn v8__Locker__IsLocked(isolate: *mut RealIsolate) -> bool;
-
-  pub(super) fn v8__Unlocker__CONSTRUCT(
-    buf: *mut MaybeUninit<Unlocker>,
-    isolate: *mut RealIsolate,
-  );
-  pub(super) fn v8__Unlocker__DESTRUCT(this: *mut Unlocker);
 }
