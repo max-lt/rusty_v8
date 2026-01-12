@@ -822,13 +822,16 @@ fn print_prebuilt_src_binding_path() {
   let name = format!("src_binding{features}_{profile}_{target}.rs");
 
   // Use OUT_DIR to avoid modifying source directory during cargo publish verification
-  let out_dir = env::var("OUT_DIR").map(PathBuf::from).unwrap_or_else(|_| get_dirs().root.join("gen"));
+  let out_dir = env::var("OUT_DIR")
+    .map(PathBuf::from)
+    .unwrap_or_else(|_| get_dirs().root.join("gen"));
   let src_binding_path = out_dir.join(name.clone());
 
   if !src_binding_path.exists() {
     fs::create_dir_all(&out_dir).unwrap();
     let default_base = "https://github.com/max-lt/rusty_v8/releases/download";
-    let base = env::var("RUSTY_V8_MIRROR").unwrap_or_else(|_| default_base.into());
+    let base =
+      env::var("RUSTY_V8_MIRROR").unwrap_or_else(|_| default_base.into());
     let version = env::var("CARGO_PKG_VERSION").unwrap();
     let url = format!("{base}/v{version}/{name}");
     download_file(&url, &src_binding_path);
