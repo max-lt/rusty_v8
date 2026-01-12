@@ -7,6 +7,7 @@ authors = ["the Deno authors", "max-lt <contact@openworkers.dev>"]
 license = "MIT"
 edition = "2024"
 repository = "https://github.com/max-lt/rusty_v8"
+
 exclude = [
   # To keep the package under the 10mb limit imposed by crates.io we exclude
   # a lot of files that are not needed for the build.
@@ -91,6 +92,9 @@ exclude = [
   "!v8/tools/snapshot/asm_to_inline_asm.py",
   "!v8/tools/testrunner/utils/dump_build_config.py",
 ]
+
+[lib]
+name = "v8"
 
 [profile.dev]
 # rusty_v8 may miscompile at opt-level=0.
