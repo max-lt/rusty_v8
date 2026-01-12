@@ -550,7 +550,7 @@ fn static_lib_url() -> String {
   if let Ok(custom_archive) = env::var("RUSTY_V8_ARCHIVE") {
     return custom_archive;
   }
-  let default_base = "https://github.com/denoland/rusty_v8/releases/download";
+  let default_base = "https://github.com/max-lt/rusty_v8/releases/download";
   let base =
     env::var("RUSTY_V8_MIRROR").unwrap_or_else(|_| default_base.into());
   let version = env::var("CARGO_PKG_VERSION").unwrap();
@@ -821,9 +821,14 @@ fn print_prebuilt_src_binding_path() {
   let features = prebuilt_features_suffix();
   let name = format!("src_binding{features}_{profile}_{target}.rs");
 
-  let src_binding_path = get_dirs().root.join("gen").join(name.clone());
+  // Use OUT_DIR to avoid modifying source directory during cargo publish verification
+  let out_dir = env::var("OUT_DIR").map(PathBuf::from).unwrap_or_else(|_| get_dirs().root.join("gen"));
+  let src_binding_path = out_dir.join(name.clone());
 
-  if let Ok(base) = env::var("RUSTY_V8_MIRROR") {
+  if !src_binding_path.exists() {
+    fs::create_dir_all(&out_dir).unwrap();
+    let default_base = "https://github.com/max-lt/rusty_v8/releases/download";
+    let base = env::var("RUSTY_V8_MIRROR").unwrap_or_else(|_| default_base.into());
     let version = env::var("CARGO_PKG_VERSION").unwrap();
     let url = format!("{base}/v{version}/{name}");
     download_file(&url, &src_binding_path);
