@@ -526,15 +526,9 @@ fn get_system_rust_sysroot() -> String {
 }
 
 fn download_rust_toolchain() {
-  // On native ARM64 Linux, Chromium doesn't provide a prebuilt Rust toolchain
-  // We'll use the system Rust toolchain instead via rust_sysroot_absolute GN arg
-  if is_native_arm64_linux() {
-    println!(
-      "cargo:warning=Native ARM64 Linux detected, using system Rust toolchain"
-    );
-    return;
-  }
-
+  // rust_toolchain.py handles:
+  // - ARM64 Linux: creates symlinks to system Rust + bindgen
+  // - Other platforms: downloads Chromium's prebuilt Rust toolchain
   assert!(
     Command::new(python())
       .arg("./tools/rust_toolchain.py")
