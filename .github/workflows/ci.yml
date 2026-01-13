@@ -180,7 +180,8 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-22.04
-    if: github.repository == 'max-lt/rusty_v8' && startsWith(github.ref, 'refs/tags/')
+    # Only publish on proper semver tags (vX.Y.Z), not test tags (vX.Y.Z-test)
+    if: github.repository == 'max-lt/rusty_v8' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
     steps:
       - name: Configure git
         run: git config --global core.symlinks true
