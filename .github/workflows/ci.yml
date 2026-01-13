@@ -15,6 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         config:
+          # With pointer compression
           - os: macos-15
             target: aarch64-apple-darwin
             variant: release
@@ -25,6 +26,19 @@ jobs:
             target: x86_64-unknown-linux-gnu
             variant: release
             v8_enable_pointer_compression: true
+            cargo: cargo
+
+          # Without pointer compression (needed for cargo publish verification)
+          - os: macos-15
+            target: aarch64-apple-darwin
+            variant: release
+            v8_enable_pointer_compression: false
+            cargo: cargo
+
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            variant: release
+            v8_enable_pointer_compression: false
             cargo: cargo
 
     env:
