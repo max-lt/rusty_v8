@@ -420,7 +420,7 @@ dependencies = [
 
 [[package]]
 name = "openworkers-v8"
-version = "142.2.2"
+version = "142.2.2-test"
 dependencies = [
  "align-data",
  "bindgen",
