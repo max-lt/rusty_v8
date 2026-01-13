@@ -314,8 +314,6 @@ fn build_v8(is_asan: bool) {
     gn_args.push("host_cpu=\"arm64\"".to_string());
   }
 
-
-
   if env::var_os("DISABLE_CLANG").is_some() {
     gn_args.push("is_clang=false".into());
     // -gline-tables-only is Clang-only
@@ -511,13 +509,7 @@ fn download_ninja_gn_binaries() {
   }
 }
 
-
-
-
-
 fn download_rust_toolchain() {
-
-
   assert!(
     Command::new(python())
       .arg("./tools/rust_toolchain.py")
