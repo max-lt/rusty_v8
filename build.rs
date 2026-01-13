@@ -314,13 +314,7 @@ fn build_v8(is_asan: bool) {
     gn_args.push("host_cpu=\"arm64\"".to_string());
   }
 
-  // On native ARM64 Linux, use system Rust toolchain (Chromium doesn't provide prebuilt)
-  if is_native_arm64_linux() {
-    let sysroot = get_system_rust_sysroot();
-    println!("cargo:warning=Using system Rust sysroot: {}", sysroot);
-    gn_args.push(format!("rust_sysroot_absolute=\"{}\"", sysroot));
-    gn_args.push("host_cpu=\"arm64\"".to_string());
-  }
+
 
   if env::var_os("DISABLE_CLANG").is_some() {
     gn_args.push("is_clang=false".into());
@@ -363,6 +357,10 @@ fn build_v8(is_asan: bool) {
     gn_args.push("use_sysroot=true".to_string());
     maybe_install_sysroot("arm64");
     maybe_install_sysroot("amd64");
+    gn_args.push(
+      r#"v8_snapshot_toolchain="//build/toolchain/linux:clang_x64""#
+        .to_string(),
+    );
   }
   if target_arch == "arm" {
     gn_args.push(r#"target_cpu="arm""#.to_string());
@@ -513,27 +511,12 @@ fn download_ninja_gn_binaries() {
   }
 }
 
-fn is_native_arm64_linux() -> bool {
-  cfg!(target_os = "linux") && cfg!(target_arch = "aarch64")
-}
 
-fn get_system_rust_sysroot() -> String {
-  let output = Command::new("rustc")
-    .args(["--print", "sysroot"])
-    .output()
-    .expect("Failed to get rustc sysroot");
-  String::from_utf8(output.stdout).unwrap().trim().to_string()
-}
+
+
 
 fn download_rust_toolchain() {
-  // On native ARM64 Linux, Chromium doesn't provide a prebuilt Rust toolchain
-  // We'll use the system Rust toolchain instead via rust_sysroot_absolute GN arg
-  if is_native_arm64_linux() {
-    println!(
-      "cargo:warning=Native ARM64 Linux detected, using system Rust toolchain"
-    );
-    return;
-  }
+
 
   assert!(
     Command::new(python())
