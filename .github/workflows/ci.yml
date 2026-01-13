@@ -137,9 +137,21 @@ jobs:
           sudo apt-get install lld-19 clang-19 clang-tools-19 clang-tidy-19 clang-format-19 libclang-19-dev libclang-rt-19-dev -y
           echo "LIBCLANG_PATH=/usr/lib/llvm-19/lib" >> $GITHUB_ENV
           echo "CLANG_BASE_PATH=/usr/lib/llvm-19" >> $GITHUB_ENV
-          # Disable compiler-rt on ARM64 (not available in Ubuntu packages)
+          # On ARM64, create symlink for compiler-rt builtins (GN expects different path)
           if [ "${{ matrix.config.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            echo "EXTRA_GN_ARGS=use_compiler_rt=false" >> $GITHUB_ENV
+            # Find actual clang resource dir
+            CLANG_RESOURCE_DIR=$(clang-19 --print-resource-dir)
+            echo "Clang resource dir: $CLANG_RESOURCE_DIR"
+            # Create expected directory structure
+            sudo mkdir -p /usr/lib/llvm-19/lib/clang/22/lib/aarch64-unknown-linux-gnu
+            # Find and link the builtins library
+            BUILTINS_LIB=$(find /usr/lib/llvm-19 -name "libclang_rt.builtins*.a" -print -quit 2>/dev/null || true)
+            if [ -n "$BUILTINS_LIB" ]; then
+              echo "Found builtins at: $BUILTINS_LIB"
+              sudo ln -sf "$BUILTINS_LIB" /usr/lib/llvm-19/lib/clang/22/lib/aarch64-unknown-linux-gnu/libclang_rt.builtins.a
+            else
+              echo "Warning: libclang_rt.builtins not found, build may fail"
+            fi
           fi
 
       - name: check rust code formatting
