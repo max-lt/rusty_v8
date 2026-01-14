@@ -168,7 +168,6 @@ fn build_binding() {
         && !arg.starts_with("-Xclang")
         && !arg.contains("DUSE_LIBCXX_MODULES")
         && !arg.contains("-nostdinc++")
-        && !arg.contains("-isystem")
         && !arg.contains("libc++")
     })
     .copied()
