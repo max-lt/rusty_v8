@@ -211,6 +211,20 @@ fn build_binding() {
         clang_args.push(format!("-isystem{}/include", resource_dir.trim()));
       }
     }
+
+    // Attempt 7: Manually inject sysroot for cross-compilation
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    if target_arch == "aarch64" {
+      let sysroot = env::current_dir()
+        .unwrap()
+        .join("build/linux/debian_bullseye_arm64-sysroot");
+      if sysroot.exists() {
+        clang_args.push(format!("--sysroot={}", sysroot.display()));
+        println!("cargo:warning=Injecting sysroot: {}", sysroot.display());
+      } else {
+        println!("cargo:warning=Sysroot not found at: {}", sysroot.display());
+      }
+    }
   }
 
   println!("cargo:warning=CLANG_ARGS: {clang_args:?}");
