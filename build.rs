@@ -213,6 +213,8 @@ fn build_binding() {
     }
   }
 
+  println!("cargo:warning=CLANG_ARGS: {clang_args:?}");
+  println!("cargo:warning=FILTERED_ARGS: {filtered_args:?}");
   let bindings = bindgen::Builder::default()
     .header("src/binding.hpp")
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
