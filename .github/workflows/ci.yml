@@ -145,9 +145,14 @@ jobs:
         run: |
           clang-format-19 --verbose --Werror --dry-run src/*.cc src/*.hpp src/*.h
 
+      - name: Install ARM64 Cross-Linker
+        if: matrix.config.target == 'aarch64-unknown-linux-gnu' && startsWith(matrix.config.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
       - name: Test
         env:
           SCCACHE_IDLE_TIMEOUT: 0
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: ${{ matrix.config.cargo }} nextest run -v --cargo-verbose --cargo-verbose --all-targets --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }}
 
       - name: Clippy
