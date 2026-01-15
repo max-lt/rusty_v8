@@ -1,6 +1,6 @@
 [package]
 name = "openworkers-v8"
-version = "142.2.2-test-g-7"
+version = "142.2.2-test-g-8"
 description = "Rust bindings to V8 (fork with Locker/UnenteredIsolate support for isolate pooling)"
 readme = "README.md"
 authors = ["the Deno authors", "max-lt <contact@openworkers.dev>"]

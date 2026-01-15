@@ -220,6 +220,7 @@ fn build_binding() {
         .join("build/linux/debian_bullseye_arm64-sysroot");
       if sysroot.exists() {
         clang_args.push(format!("--sysroot={}", sysroot.display()));
+        clang_args.push("--target=aarch64-linux-gnu".to_string());
         println!("cargo:warning=Injecting sysroot: {}", sysroot.display());
       } else {
         println!("cargo:warning=Sysroot not found at: {}", sysroot.display());
