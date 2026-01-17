@@ -216,7 +216,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -yq --no-install-suggests --no-install-recommends \
             binfmt-support qemu qemu-user qemu-user-binfmt \
-            gcc-aarch64-linux-gnu libc6-arm64-cross
+            g++-10-aarch64-linux-gnu gcc-10-aarch64-linux-gnu libc6-arm64-cross
+
+          sudo ln -s /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 /lib/ld-linux-aarch64.so.1
 
       - name: Download nextest archive
         uses: actions/download-artifact@v4
