@@ -61,7 +61,15 @@ jobs:
       - name: Write git_submodule_status.txt
         run: git submodule status --recursive > git_submodule_status.txt
 
-      - name: Cache
+      - name: Cache nextest archive
+        id: cache-nextest
+        uses: actions/cache@v4
+        with:
+          path: target/nextest-archive.tar.zst
+          key: nextest-${{ matrix.config.target }}-${{ matrix.config.v8_enable_pointer_compression }}-${{ hashFiles('Cargo.lock', 'build.rs', 'src/**', 'git_submodule_status.txt') }}
+
+      - name: Cache sccache
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |-
@@ -73,6 +81,7 @@ jobs:
           restore-keys: cargo1-${{ matrix.config.target }}-release-${{ matrix.config.v8_enable_pointer_compression }}-
 
       - name: Install and start sccache
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         shell: pwsh
         env:
           SCCACHE_DIR: ${{ github.workspace }}/target/sccache
@@ -94,6 +103,7 @@ jobs:
           echo "$(pwd)/$basename" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Clang
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         run: |
           echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" | sudo dd of=/etc/apt/sources.list.d/llvm-toolchain-jammy-19.list
           curl https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor | sudo dd of=/etc/apt/trusted.gpg.d/llvm-snapshot.gpg
@@ -103,16 +113,19 @@ jobs:
           echo "LIBCLANG_PATH=/usr/lib/llvm-19/lib" >> $GITHUB_ENV
 
       - name: Check rust code formatting
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         run: cargo fmt --check
 
       - name: Check c++ code formatting
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         run: clang-format-19 --verbose --Werror --dry-run src/*.cc src/*.hpp src/*.h
 
       - name: Install ARM64 Cross-Linker
-        if: matrix.config.target == 'aarch64-unknown-linux-gnu'
+        if: steps.cache-nextest.outputs.cache-hit != 'true' && matrix.config.target == 'aarch64-unknown-linux-gnu'
         run: sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build and create nextest archive
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         env:
           SCCACHE_IDLE_TIMEOUT: 0
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
@@ -126,11 +139,13 @@ jobs:
             --archive-file target/nextest-archive.tar.zst
 
       - name: Clippy
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: ${{ matrix.config.cargo }} clippy --all-targets --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }} -- -D clippy::all
 
       - name: Prepare binary publish
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         run: |
           gzip -9c target/${{ matrix.config.target }}/release/gn_out/obj/${{ env.LIB_NAME }}.${{ env.LIB_EXT }} > target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
           ls -l target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
@@ -140,7 +155,7 @@ jobs:
 
       - name: Binary publish
         uses: softprops/action-gh-release@v0.1.15
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.cache-nextest.outputs.cache-hit != 'true' && startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -156,6 +171,7 @@ jobs:
           retention-days: 1
 
       - name: Upload src_binding
+        if: steps.cache-nextest.outputs.cache-hit != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: src_binding${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.rs
@@ -199,7 +215,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -yq --no-install-suggests --no-install-recommends \
-            binfmt-support qemu qemu-user qemu-user-binfmt libc6-arm64-cross
+            binfmt-support qemu qemu-user qemu-user-binfmt \
+            gcc-aarch64-linux-gnu libc6-arm64-cross
 
       - name: Download nextest archive
         uses: actions/download-artifact@v4
