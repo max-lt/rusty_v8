@@ -8,54 +8,26 @@ permissions: write-all
 
 jobs:
   build:
-    name: ${{ matrix.config.variant }} ${{ matrix.config.target }} ${{ matrix.config.v8_enable_pointer_compression && 'ptrcomp' || '' }}
+    name: build ${{ matrix.config.target }} ${{ matrix.config.v8_enable_pointer_compression && 'ptrcomp' || '' }}
     runs-on: ${{ matrix.config.os }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         config:
-          # With pointer compression
-#          - os: macos-15
-#            target: aarch64-apple-darwin
-#            variant: release
-#            v8_enable_pointer_compression: true
-#            cargo: cargo
-
-#          - os: ubuntu-22.04
-#            target: x86_64-unknown-linux-gnu
-#            variant: release
-#            v8_enable_pointer_compression: true
-#            cargo: cargo
-
           - os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
-            variant: release
             v8_enable_pointer_compression: true
             cargo: cargo
 
-          # Without pointer compression (needed for cargo publish verification)
- #         - os: macos-15
- #           target: aarch64-apple-darwin
- #           variant: release
- #           v8_enable_pointer_compression: false
- #           cargo: cargo
-
- #         - os: ubuntu-22.04
- #           target: x86_64-unknown-linux-gnu
- #           variant: release
- #           v8_enable_pointer_compression: false
- #           cargo: cargo
-
           - os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
-            variant: release
             v8_enable_pointer_compression: false
             cargo: cargo
 
     env:
       V8_FROM_SOURCE: true
-      CARGO_VARIANT_FLAG: ${{ matrix.config.variant == 'release' && '--release' || '' }}
+      CARGO_VARIANT_FLAG: --release
       CARGO_FEATURE_FLAGS: ${{ matrix.config.v8_enable_pointer_compression && '--features v8_enable_pointer_compression' || '' }}
       LIB_NAME: librusty_v8
       LIB_EXT: a
@@ -92,19 +64,13 @@ jobs:
       - name: Cache
         uses: actions/cache@v4
         with:
-          # Note: rusty_v8 targets always get get rebuilt, and their outputs
-          # ('librusty_v8.rlib', the whole 'gn_out' directory, etc.) can be
-          # quite big, so we cache only those subdirectories of
-          # target/{debug|release} that contain the build output for crates that
-          # come from the registry. By additionally saving the sccache cache
-          # directory it's still possible to build v8 fast.
           path: |-
             target/sccache
             target/*/.*
             target/*/build
             target/*/deps
-          key: cargo1-${{ matrix.config.target }}-${{ matrix.config.variant }}-${{ matrix.config.v8_enable_pointer_compression }}-${{ hashFiles('Cargo.lock', 'build.rs', 'git_submodule_status.txt') }}
-          restore-keys: cargo1-${{ matrix.config.target }}-${{ matrix.config.variant }}-${{ matrix.config.v8_enable_pointer_compression }}-
+          key: cargo1-${{ matrix.config.target }}-release-${{ matrix.config.v8_enable_pointer_compression }}-${{ hashFiles('Cargo.lock', 'build.rs', 'git_submodule_status.txt') }}
+          restore-keys: cargo1-${{ matrix.config.target }}-release-${{ matrix.config.v8_enable_pointer_compression }}-
 
       - name: Install and start sccache
         shell: pwsh
@@ -128,7 +94,6 @@ jobs:
           echo "$(pwd)/$basename" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Clang
-        if: startsWith(matrix.config.os, 'ubuntu')
         run: |
           echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" | sudo dd of=/etc/apt/sources.list.d/llvm-toolchain-jammy-19.list
           curl https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor | sudo dd of=/etc/apt/trusted.gpg.d/llvm-snapshot.gpg
@@ -137,34 +102,41 @@ jobs:
           sudo apt-get install lld-19 clang-19 clang-tools-19 clang-tidy-19 clang-format-19 libclang-19-dev -y
           echo "LIBCLANG_PATH=/usr/lib/llvm-19/lib" >> $GITHUB_ENV
 
-      - name: check rust code formatting
+      - name: Check rust code formatting
         run: cargo fmt --check
 
-      - name: check c++ code formatting
-        if: startsWith(matrix.config.os, 'ubuntu')
-        run: |
-          clang-format-19 --verbose --Werror --dry-run src/*.cc src/*.hpp src/*.h
+      - name: Check c++ code formatting
+        run: clang-format-19 --verbose --Werror --dry-run src/*.cc src/*.hpp src/*.h
 
       - name: Install ARM64 Cross-Linker
-        if: matrix.config.target == 'aarch64-unknown-linux-gnu' && startsWith(matrix.config.os, 'ubuntu')
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+        if: matrix.config.target == 'aarch64-unknown-linux-gnu'
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Test
+      - name: Build and create nextest archive
         env:
           SCCACHE_IDLE_TIMEOUT: 0
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-        run: ${{ matrix.config.cargo }} nextest run -v --cargo-verbose --cargo-verbose --all-targets --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }}
+        run: |
+          ${{ matrix.config.cargo }} nextest archive \
+            --cargo-verbose --cargo-verbose \
+            --all-targets \
+            --target ${{ matrix.config.target }} \
+            ${{ env.CARGO_VARIANT_FLAG }} \
+            ${{ env.CARGO_FEATURE_FLAGS }} \
+            --archive-file target/nextest-archive.tar.zst
 
       - name: Clippy
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: ${{ matrix.config.cargo }} clippy --all-targets --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }} -- -D clippy::all
 
       - name: Prepare binary publish
         run: |
-          gzip -9c target/${{ matrix.config.target }}/${{ matrix.config.variant }}/gn_out/obj/${{ env.LIB_NAME }}.${{ env.LIB_EXT }} > target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
-          ls -l target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
+          gzip -9c target/${{ matrix.config.target }}/release/gn_out/obj/${{ env.LIB_NAME }}.${{ env.LIB_EXT }} > target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
+          ls -l target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
 
-          cp target/${{ matrix.config.target }}/${{ matrix.config.variant}}/gn_out/src_binding.rs target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
-          ls -l target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
+          cp target/${{ matrix.config.target }}/release/gn_out/src_binding.rs target/src_binding${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.rs
+          ls -l target/src_binding${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.rs
 
       - name: Binary publish
         uses: softprops/action-gh-release@v0.1.15
@@ -173,17 +145,66 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: |
-            target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
-            target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
+            target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
+            target/src_binding${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.rs
 
-      - name: Upload CI artifacts
+      - name: Upload nextest archive
         uses: actions/upload-artifact@v4
         with:
-          name: src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
-          path: target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
+          name: nextest-archive${{ env.FEATURES_SUFFIX }}-${{ matrix.config.target }}
+          path: target/nextest-archive.tar.zst
+          retention-days: 1
+
+      - name: Upload src_binding
+        uses: actions/upload-artifact@v4
+        with:
+          name: src_binding${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.rs
+          path: target/src_binding${{ env.FEATURES_SUFFIX }}_release_${{ matrix.config.target }}.rs
+
+  test-arm64:
+    name: test ${{ matrix.config.target }} ${{ matrix.config.v8_enable_pointer_compression && 'ptrcomp' || '' }}
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - target: aarch64-unknown-linux-gnu
+            v8_enable_pointer_compression: true
+
+          - target: aarch64-unknown-linux-gnu
+            v8_enable_pointer_compression: false
+
+    env:
+      FEATURES_SUFFIX: ${{ matrix.config.v8_enable_pointer_compression && '_ptrcomp' || '' }}
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Install rust
+        uses: dsherret/rust-toolchain-file@v1
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install nextest
+        run: cargo binstall cargo-nextest --secure
+
+      - name: Download nextest archive
+        uses: actions/download-artifact@v4
+        with:
+          name: nextest-archive${{ env.FEATURES_SUFFIX }}-${{ matrix.config.target }}
+
+      - name: Run tests
+        run: cargo nextest run --archive-file nextest-archive.tar.zst
 
   publish:
-    needs: build
+    needs: [build, test-arm64]
     runs-on: ubuntu-22.04
     if: github.repository == 'max-lt/rusty_v8' && startsWith(github.ref, 'refs/tags/')
     steps:
