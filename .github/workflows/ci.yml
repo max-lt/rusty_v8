@@ -164,8 +164,8 @@ jobs:
   test-arm64:
     name: test ${{ matrix.config.target }} ${{ matrix.config.v8_enable_pointer_compression && 'ptrcomp' || '' }}
     needs: build
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 30
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -195,12 +195,20 @@ jobs:
       - name: Install nextest
         run: cargo binstall cargo-nextest --secure
 
+      - name: Install QEMU for ARM64 emulation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends \
+            binfmt-support qemu qemu-user qemu-user-binfmt libc6-arm64-cross
+
       - name: Download nextest archive
         uses: actions/download-artifact@v4
         with:
           name: nextest-archive${{ env.FEATURES_SUFFIX }}-${{ matrix.config.target }}
 
       - name: Run tests
+        env:
+          QEMU_LD_PREFIX: /usr/aarch64-linux-gnu
         run: cargo nextest run --archive-file nextest-archive.tar.zst
 
   publish:
