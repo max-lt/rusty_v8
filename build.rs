@@ -310,8 +310,10 @@ fn build_v8(is_asan: bool) {
     && target_os == "linux"
     && env::var("CARGO_FEATURE_V8_ENABLE_POINTER_COMPRESSION").is_ok()
   {
-    gn_args.push("cppgc_enable_larger_cage=false".to_string());
-    gn_args.push("v8_enable_pointer_compression_shared_cage=true".to_string());
+    // Disable cppgc pointer compression - it uses partition_alloc pools
+    // that may not be properly configured for ARM64 Linux
+    gn_args.push("cppgc_enable_pointer_compression=false".to_string());
+    gn_args.push("cppgc_enable_caged_heap=false".to_string());
   }
 
   gn_args.push(format!(
