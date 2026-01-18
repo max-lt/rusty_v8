@@ -304,6 +304,16 @@ fn build_v8(is_asan: bool) {
     gn_args.push(arg.to_string());
   }
 
+  // ARM64 Linux + pointer compression: configure cppgc cage settings
+  // to avoid address space issues with partition_alloc
+  if target_arch == "aarch64"
+    && target_os == "linux"
+    && env::var("CARGO_FEATURE_V8_ENABLE_POINTER_COMPRESSION").is_ok()
+  {
+    gn_args.push("cppgc_enable_larger_cage=false".to_string());
+    gn_args.push("v8_enable_pointer_compression_shared_cage=true".to_string());
+  }
+
   gn_args.push(format!(
     "v8_enable_v8_checks={}",
     env::var("CARGO_FEATURE_V8_ENABLE_V8_CHECKS").is_ok()
