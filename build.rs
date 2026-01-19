@@ -304,16 +304,14 @@ fn build_v8(is_asan: bool) {
     gn_args.push(arg.to_string());
   }
 
-  // ARM64 Linux + pointer compression: configure cppgc cage settings
-  // to avoid address space issues with partition_alloc
+  // ARM64 Linux + pointer compression: disable partition_alloc
+  // to avoid PA_NOTREACHED errors in GetPoolInfo() when the pointer
+  // compression cage address doesn't match any known PA pool
   if target_arch == "aarch64"
     && target_os == "linux"
     && env::var("CARGO_FEATURE_V8_ENABLE_POINTER_COMPRESSION").is_ok()
   {
-    // Disable cppgc pointer compression - it uses partition_alloc pools
-    // that may not be properly configured for ARM64 Linux
-    gn_args.push("cppgc_enable_pointer_compression=false".to_string());
-    gn_args.push("cppgc_enable_caged_heap=false".to_string());
+    gn_args.push("use_partition_alloc=false".to_string());
   }
 
   gn_args.push(format!(
