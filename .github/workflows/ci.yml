@@ -15,28 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # With pointer compression
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            v8_enable_pointer_compression: true
-            cargo: cargo
-
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: release
-            v8_enable_pointer_compression: true
-            cargo: cargo
-
-          # Without pointer compression (needed for cargo publish verification)
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            v8_enable_pointer_compression: false
-            cargo: cargo
-
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
+          # Native ARM64 Linux - without pointer compression
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
             variant: release
             v8_enable_pointer_compression: false
             cargo: cargo
@@ -80,12 +61,6 @@ jobs:
       - name: Cache
         uses: actions/cache@v4
         with:
-          # Note: rusty_v8 targets always get get rebuilt, and their outputs
-          # ('librusty_v8.rlib', the whole 'gn_out' directory, etc.) can be
-          # quite big, so we cache only those subdirectories of
-          # target/{debug|release} that contain the build output for crates that
-          # come from the registry. By additionally saving the sccache cache
-          # directory it's still possible to build v8 fast.
           path: |-
             target/sccache
             target/*/.*
@@ -102,11 +77,7 @@ jobs:
           SCCACHE_IDLE_TIMEOUT: 0
         run: |
           $version = "v0.8.2"
-          $platform =
-            @{ "aarch64-apple-darwin"      = "aarch64-apple-darwin"
-               "x86_64-unknown-linux-gnu"  = "x86_64-unknown-linux-musl"
-               "aarch64-unknown-linux-gnu" = "aarch64-unknown-linux-musl"
-             }['${{ matrix.config.target }}']
+          $platform = "aarch64-unknown-linux-musl"
           $basename = "sccache-$version-$platform"
           $url = "https://github.com/mozilla/sccache/releases/download/$version/$basename.tar.gz"
           cd ~
@@ -116,37 +87,35 @@ jobs:
           echo "$(pwd)/$basename" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Clang
-        if: startsWith(matrix.config.os, 'ubuntu')
         run: |
-          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" | sudo dd of=/etc/apt/sources.list.d/llvm-toolchain-jammy-19.list
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" | sudo dd of=/etc/apt/sources.list.d/llvm-toolchain-noble-19.list
           curl https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor | sudo dd of=/etc/apt/trusted.gpg.d/llvm-snapshot.gpg
           sudo apt-get update
-          sudo apt-get -qq remove 'clang-*'
-          sudo apt-get install lld-19 clang-19 clang-tools-19 clang-tidy-19 clang-format-19 libclang-19-dev -y
+          sudo apt-get -qq remove 'clang-*' || true
+          sudo apt-get install lld-19 clang-19 clang-tools-19 clang-format-19 libclang-19-dev -y
           echo "LIBCLANG_PATH=/usr/lib/llvm-19/lib" >> $GITHUB_ENV
 
       - name: check rust code formatting
         run: cargo fmt --check
 
       - name: check c++ code formatting
-        if: startsWith(matrix.config.os, 'ubuntu')
         run: |
           clang-format-19 --verbose --Werror --dry-run src/*.cc src/*.hpp src/*.h
 
       - name: Test
         env:
           SCCACHE_IDLE_TIMEOUT: 0
-        run: ${{ matrix.config.cargo }} nextest run -v --cargo-verbose --cargo-verbose --all-targets --locked --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }}
+        run: ${{ matrix.config.cargo }} nextest run -v --cargo-verbose --cargo-verbose --all-targets --locked ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }}
 
       - name: Clippy
-        run: ${{ matrix.config.cargo }} clippy --all-targets --locked --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }} -- -D clippy::all
+        run: ${{ matrix.config.cargo }} clippy --all-targets --locked ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }} -- -D clippy::all
 
       - name: Prepare binary publish
         run: |
-          gzip -9c target/${{ matrix.config.target }}/${{ matrix.config.variant }}/gn_out/obj/${{ env.LIB_NAME }}.${{ env.LIB_EXT }} > target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
+          gzip -9c target/${{ matrix.config.variant }}/gn_out/obj/${{ env.LIB_NAME }}.${{ env.LIB_EXT }} > target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
           ls -l target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
 
-          cp target/${{ matrix.config.target }}/${{ matrix.config.variant}}/gn_out/src_binding.rs target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
+          cp target/${{ matrix.config.variant}}/gn_out/src_binding.rs target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
           ls -l target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
 
       - name: Binary publish
@@ -164,37 +133,3 @@ jobs:
         with:
           name: src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
           path: target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
-
-  publish:
-    needs: build
-    runs-on: ubuntu-22.04
-    if: github.repository == 'max-lt/rusty_v8' && startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Configure git
-        run: git config --global core.symlinks true
-
-      - name: Clone repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 10
-          submodules: false
-
-      - name: Install rust
-        uses: dsherret/rust-toolchain-file@v1
-
-      - name: Install python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.11.x
-
-      - name: Download CI artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: gen
-          pattern: src_binding_*.rs
-          merge-multiple: true
-
-      - name: Publish
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -vv --locked --allow-dirty
