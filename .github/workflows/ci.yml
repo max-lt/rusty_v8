@@ -97,6 +97,7 @@ jobs:
           sudo apt-get -qq remove 'clang-*' || true
           sudo apt-get install lld-19 clang-19 clang-tools-19 clang-format-19 libclang-19-dev -y
           echo "LIBCLANG_PATH=/usr/lib/llvm-19/lib" >> $GITHUB_ENV
+          echo "CLANG_BASE_PATH=/usr/lib/llvm-19" >> $GITHUB_ENV
 
       - name: check rust code formatting
         run: cargo fmt --check

@@ -369,12 +369,16 @@ fn build_v8(is_asan: bool) {
       gn_args.push(arg.to_string());
     }
   }
-  // cross-compilation setup
-  if target_arch == "aarch64" {
+  // cross-compilation setup (skip for native ARM64 Linux)
+  if target_arch == "aarch64" && !is_native_arm64_linux() {
     gn_args.push(r#"target_cpu="arm64""#.to_string());
     gn_args.push("use_sysroot=true".to_string());
     maybe_install_sysroot("arm64");
     maybe_install_sysroot("amd64");
+  } else if target_arch == "aarch64" && is_native_arm64_linux() {
+    // Native ARM64 Linux: set target_cpu but don't use sysroot
+    gn_args.push(r#"target_cpu="arm64""#.to_string());
+    gn_args.push("use_sysroot=false".to_string());
   }
   if target_arch == "arm" {
     gn_args.push(r#"target_cpu="arm""#.to_string());
