@@ -321,6 +321,11 @@ fn build_v8(is_asan: bool) {
     gn_args.push(format!("rust_sysroot_absolute=\"{}\"", sysroot));
     gn_args.push("host_cpu=\"arm64\"".to_string());
 
+    // Get rustc version for Chromium build scripts
+    let rustc_version = get_rustc_version();
+    println!("cargo:warning=Using rustc version: {}", rustc_version);
+    gn_args.push(format!("rustc_version=\"{}\"", rustc_version));
+
     // Use system bindgen (installed via cargo)
     if let Some(cargo_home) = home::cargo_home().ok() {
       let bindgen_root = cargo_home.display().to_string();
@@ -529,6 +534,14 @@ fn get_system_rust_sysroot() -> String {
     .args(["--print", "sysroot"])
     .output()
     .expect("Failed to get rustc sysroot");
+  String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
+fn get_rustc_version() -> String {
+  let output = Command::new("rustc")
+    .args(["--version"])
+    .output()
+    .expect("Failed to get rustc version");
   String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
