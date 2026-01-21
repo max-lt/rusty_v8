@@ -320,6 +320,13 @@ fn build_v8(is_asan: bool) {
     println!("cargo:warning=Using system Rust sysroot: {}", sysroot);
     gn_args.push(format!("rust_sysroot_absolute=\"{}\"", sysroot));
     gn_args.push("host_cpu=\"arm64\"".to_string());
+
+    // Use system bindgen (installed via cargo)
+    if let Some(cargo_home) = home::cargo_home().ok() {
+      let bindgen_root = cargo_home.display().to_string();
+      println!("cargo:warning=Using system bindgen from: {}", bindgen_root);
+      gn_args.push(format!("rust_bindgen_root=\"{}\"", bindgen_root));
+    }
   }
 
   if env::var_os("DISABLE_CLANG").is_some() {

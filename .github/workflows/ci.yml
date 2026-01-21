@@ -50,6 +50,9 @@ jobs:
       - name: Install nextest
         run: cargo binstall cargo-nextest --secure
 
+      - name: Install bindgen-cli
+        run: cargo binstall bindgen-cli --secure
+
       - name: Install python
         uses: actions/setup-python@v5
         with:
