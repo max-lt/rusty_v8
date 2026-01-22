@@ -101,9 +101,8 @@ jobs:
           echo "CLANG_BASE_PATH=/usr/lib/llvm-19" >> $GITHUB_ENV
           # Add llvm-19 bin to PATH so clang/clang++ resolve to clang-19
           echo "/usr/lib/llvm-19/bin" >> $GITHUB_PATH
-          # Debug: show clang version and resource dir
-          /usr/lib/llvm-19/bin/clang --version
-          /usr/lib/llvm-19/bin/clang -print-resource-dir
+          # Create symlink for Rust's LLVM version (22) to use clang-19's compiler-rt
+          sudo ln -s /usr/lib/llvm-19/lib/clang/19 /usr/lib/llvm-19/lib/clang/22
 
       - name: check rust code formatting
         run: cargo fmt --check
