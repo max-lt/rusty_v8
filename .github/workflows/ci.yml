@@ -99,6 +99,11 @@ jobs:
             libclang-rt-19-dev libglib2.0-dev pkg-config
           echo "LIBCLANG_PATH=/usr/lib/llvm-19/lib" >> $GITHUB_ENV
           echo "CLANG_BASE_PATH=/usr/lib/llvm-19" >> $GITHUB_ENV
+          # Add llvm-19 bin to PATH so clang/clang++ resolve to clang-19
+          echo "/usr/lib/llvm-19/bin" >> $GITHUB_PATH
+          # Debug: show clang version and resource dir
+          /usr/lib/llvm-19/bin/clang --version
+          /usr/lib/llvm-19/bin/clang -print-resource-dir
 
       - name: check rust code formatting
         run: cargo fmt --check
