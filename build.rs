@@ -326,6 +326,9 @@ fn build_v8(is_asan: bool) {
     println!("cargo:warning=Using rustc version: {}", rustc_version);
     gn_args.push(format!("rustc_version=\"{}\"", rustc_version));
 
+    // Use prebuilt stdlib from system sysroot instead of building it
+    gn_args.push("rust_prebuilt_stdlib=true".to_string());
+
     // Use system bindgen (installed via cargo)
     if let Some(cargo_home) = home::cargo_home().ok() {
       let bindgen_root = cargo_home.display().to_string();
