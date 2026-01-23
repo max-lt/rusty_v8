@@ -522,22 +522,6 @@ fn is_native_arm64_linux() -> bool {
   cfg!(target_os = "linux") && cfg!(target_arch = "aarch64")
 }
 
-fn get_system_rust_sysroot() -> String {
-  let output = Command::new("rustc")
-    .args(["--print", "sysroot"])
-    .output()
-    .expect("Failed to get rustc sysroot");
-  String::from_utf8(output.stdout).unwrap().trim().to_string()
-}
-
-fn get_rustc_version() -> String {
-  let output = Command::new("rustc")
-    .args(["--version"])
-    .output()
-    .expect("Failed to get rustc version");
-  String::from_utf8(output.stdout).unwrap().trim().to_string()
-}
-
 fn download_rust_toolchain() {
   // On native ARM64 Linux, Chromium doesn't provide a prebuilt Rust toolchain
   // We'll use the system Rust toolchain instead via rust_sysroot_absolute GN arg
