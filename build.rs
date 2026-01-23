@@ -314,13 +314,29 @@ fn build_v8(is_asan: bool) {
     gn_args.push("host_cpu=\"arm64\"".to_string());
   }
 
-  // On native ARM64 Linux, disable Rust in GN build
-  // Chromium's GN Rust integration tries to build stdlib from source which fails
-  // V8 itself doesn't require Rust - the Rust bindings are built by Cargo separately
+  // On native ARM64 Linux, use system Rust toolchain with prebuilt stdlib
   if is_native_arm64_linux() {
     gn_args.push("host_cpu=\"arm64\"".to_string());
-    gn_args.push("enable_rust=false".to_string());
-    println!("cargo:warning=Native ARM64 Linux: disabling Rust in GN build");
+
+    // Point to system Rust toolchain
+    let sysroot = get_system_rust_sysroot();
+    println!("cargo:warning=Using system Rust sysroot: {}", sysroot);
+    gn_args.push(format!("rust_sysroot_absolute=\"{}\"", sysroot));
+
+    // Get rustc version for Chromium build scripts
+    let rustc_version = get_rustc_version();
+    println!("cargo:warning=Using rustc version: {}", rustc_version);
+    gn_args.push(format!("rustc_version=\"{}\"", rustc_version));
+
+    // Use prebuilt stdlib from system toolchain
+    gn_args.push("rust_prebuilt_stdlib=true".to_string());
+
+    // Use system bindgen
+    if let Some(cargo_home) = home::cargo_home().ok() {
+      let bindgen_root = cargo_home.display().to_string();
+      println!("cargo:warning=Using system bindgen from: {}", bindgen_root);
+      gn_args.push(format!("rust_bindgen_root=\"{}\"", bindgen_root));
+    }
   }
 
   if env::var_os("DISABLE_CLANG").is_some() {
@@ -520,6 +536,22 @@ fn download_ninja_gn_binaries() {
 
 fn is_native_arm64_linux() -> bool {
   cfg!(target_os = "linux") && cfg!(target_arch = "aarch64")
+}
+
+fn get_system_rust_sysroot() -> String {
+  let output = Command::new("rustc")
+    .args(["--print", "sysroot"])
+    .output()
+    .expect("Failed to get rustc sysroot");
+  String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
+fn get_rustc_version() -> String {
+  let output = Command::new("rustc")
+    .args(["--version"])
+    .output()
+    .expect("Failed to get rustc version");
+  String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
 fn download_rust_toolchain() {
