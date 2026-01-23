@@ -43,10 +43,19 @@ jobs:
             features: ptrcomp
             cargo: cargo
 
+          # ===== LINUX ARM64 (cross-compile) =====
+          # Test sandbox on ARM64 Linux (may segfault due to partition_alloc)
           - os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
             variant: release
-            features: ptrcomp
+            features: sandbox
+            cargo: cargo
+
+          # Baseline without ptrcomp (known to work)
+          - os: ubuntu-22.04
+            target: aarch64-unknown-linux-gnu
+            variant: release
+            features: none
             cargo: cargo
 
           # ===== NO FEATURES (baseline) =====
