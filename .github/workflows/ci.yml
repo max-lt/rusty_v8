@@ -9,26 +9,57 @@ permissions: write-all
 
 jobs:
   build:
-    name: release ${{ matrix.config.target }} ptrcomp
+    name: ${{ matrix.config.variant }} ${{ matrix.config.target }} ${{ matrix.config.features }}
     runs-on: ${{ matrix.config.os }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         config:
-          # macOS ARM64 (Apple Silicon)
+          # ===== SANDBOX BUILDS (test new feature) =====
+          # Sandbox requires pointer compression
           - os: macos-15
             target: aarch64-apple-darwin
+            variant: release
+            features: sandbox
             cargo: cargo
 
-          # Linux x86_64
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            variant: release
+            features: sandbox
             cargo: cargo
 
-          # Linux ARM64 (for Docker arm64 builds)
+          # ===== POINTER COMPRESSION BUILDS =====
+          - os: macos-15
+            target: aarch64-apple-darwin
+            variant: release
+            features: ptrcomp
+            cargo: cargo
+
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            variant: release
+            features: ptrcomp
+            cargo: cargo
+
           - os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
+            variant: release
+            features: ptrcomp
+            cargo: cargo
+
+          # ===== NO FEATURES (baseline) =====
+          - os: macos-15
+            target: aarch64-apple-darwin
+            variant: release
+            features: none
+            cargo: cargo
+
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            variant: release
+            features: none
             cargo: cargo
 
     env:
@@ -36,6 +67,8 @@ jobs:
       LIB_NAME: librusty_v8
       LIB_EXT: a
       RUSTFLAGS: -D warnings
+      CARGO_FEATURE_FLAGS: ${{ matrix.config.features == 'sandbox' && '--features v8_enable_sandbox' || (matrix.config.features == 'ptrcomp' && '--features v8_enable_pointer_compression' || '') }}
+      FEATURES_SUFFIX: ${{ matrix.config.features == 'sandbox' && '_sandbox' || (matrix.config.features == 'ptrcomp' && '_ptrcomp' || '') }}
 
     steps:
       - name: Configure git
@@ -84,8 +117,8 @@ jobs:
             target/*/.*
             target/*/build
             target/*/deps
-          key: cargo1-${{ matrix.config.target }}-release-ptrcomp-${{ hashFiles('Cargo.lock', 'build.rs', 'git_submodule_status.txt') }}
-          restore-keys: cargo1-${{ matrix.config.target }}-release-ptrcomp-
+          key: cargo1-${{ matrix.config.target }}-${{ matrix.config.variant }}-${{ matrix.config.features }}-${{ hashFiles('Cargo.lock', 'build.rs', 'git_submodule_status.txt') }}
+          restore-keys: cargo1-${{ matrix.config.target }}-${{ matrix.config.variant }}-${{ matrix.config.features }}-
 
       - name: Install and start sccache
         shell: pwsh
@@ -98,7 +131,7 @@ jobs:
           $platform =
             @{ "aarch64-apple-darwin"      = "aarch64-apple-darwin"
                "x86_64-unknown-linux-gnu"  = "x86_64-unknown-linux-musl"
-               "aarch64-unknown-linux-gnu" = "aarch64-unknown-linux-musl"
+               "aarch64-unknown-linux-gnu" = "x86_64-unknown-linux-musl"
              }['${{ matrix.config.target }}']
           $basename = "sccache-$version-$platform"
           $url = "https://github.com/mozilla/sccache/releases/download/$version/$basename.tar.gz"
@@ -121,21 +154,21 @@ jobs:
       - name: Build
         env:
           SCCACHE_IDLE_TIMEOUT: 0
-        run: ${{ matrix.config.cargo }} build --release --features v8_enable_pointer_compression --locked --target ${{ matrix.config.target }}
+        run: ${{ matrix.config.cargo }} build --${{ matrix.config.variant }} ${{ env.CARGO_FEATURE_FLAGS }} --locked --target ${{ matrix.config.target }}
 
       - name: Test
         if: matrix.config.target != 'aarch64-unknown-linux-gnu'
         env:
           SCCACHE_IDLE_TIMEOUT: 0
-        run: ${{ matrix.config.cargo }} test --release --features v8_enable_pointer_compression --locked --target ${{ matrix.config.target }}
+        run: ${{ matrix.config.cargo }} test --${{ matrix.config.variant }} ${{ env.CARGO_FEATURE_FLAGS }} --locked --target ${{ matrix.config.target }}
 
       - name: Prepare binary publish
         run: |
-          gzip -9c target/${{ matrix.config.target }}/release/gn_out/obj/${{ env.LIB_NAME }}.${{ env.LIB_EXT }} > target/${{ env.LIB_NAME }}_ptrcomp_release_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
-          ls -l target/${{ env.LIB_NAME }}_ptrcomp_release_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
+          gzip -9c target/${{ matrix.config.target }}/${{ matrix.config.variant }}/gn_out/obj/${{ env.LIB_NAME }}.${{ env.LIB_EXT }} > target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
+          ls -l target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
 
-          cp target/${{ matrix.config.target }}/release/gn_out/src_binding.rs target/src_binding_ptrcomp_release_${{ matrix.config.target }}.rs
-          ls -l target/src_binding_ptrcomp_release_${{ matrix.config.target }}.rs
+          cp target/${{ matrix.config.target }}/${{ matrix.config.variant }}/gn_out/src_binding.rs target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
+          ls -l target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
 
       - name: Binary publish
         uses: softprops/action-gh-release@v0.1.15
@@ -144,14 +177,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: |
-            target/${{ env.LIB_NAME }}_ptrcomp_release_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
-            target/src_binding_ptrcomp_release_${{ matrix.config.target }}.rs
+            target/${{ env.LIB_NAME }}${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.${{ env.LIB_EXT }}.gz
+            target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
 
       - name: Upload CI artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: src_binding_ptrcomp_release_${{ matrix.config.target }}.rs
-          path: target/src_binding_ptrcomp_release_${{ matrix.config.target }}.rs
+          name: src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
+          path: target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
 
   publish:
     name: Publish to crates.io
