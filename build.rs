@@ -314,27 +314,13 @@ fn build_v8(is_asan: bool) {
     gn_args.push("host_cpu=\"arm64\"".to_string());
   }
 
-  // On native ARM64 Linux, use system Rust toolchain (Chromium doesn't provide prebuilt)
+  // On native ARM64 Linux, disable Rust in GN build
+  // Chromium's GN Rust integration tries to build stdlib from source which fails
+  // V8 itself doesn't require Rust - the Rust bindings are built by Cargo separately
   if is_native_arm64_linux() {
-    let sysroot = get_system_rust_sysroot();
-    println!("cargo:warning=Using system Rust sysroot: {}", sysroot);
-    gn_args.push(format!("rust_sysroot_absolute=\"{}\"", sysroot));
     gn_args.push("host_cpu=\"arm64\"".to_string());
-
-    // Get rustc version for Chromium build scripts
-    let rustc_version = get_rustc_version();
-    println!("cargo:warning=Using rustc version: {}", rustc_version);
-    gn_args.push(format!("rustc_version=\"{}\"", rustc_version));
-
-    // Use prebuilt stdlib from system sysroot instead of building it
-    gn_args.push("rust_prebuilt_stdlib=true".to_string());
-
-    // Use system bindgen (installed via cargo)
-    if let Some(cargo_home) = home::cargo_home().ok() {
-      let bindgen_root = cargo_home.display().to_string();
-      println!("cargo:warning=Using system bindgen from: {}", bindgen_root);
-      gn_args.push(format!("rust_bindgen_root=\"{}\"", bindgen_root));
-    }
+    gn_args.push("enable_rust=false".to_string());
+    println!("cargo:warning=Native ARM64 Linux: disabling Rust in GN build");
   }
 
   if env::var_os("DISABLE_CLANG").is_some() {
