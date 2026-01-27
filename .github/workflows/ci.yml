@@ -45,12 +45,12 @@ jobs:
         #   windows-2025     - x64, 4 CPU, 16 GB RAM
         #   windows-11-arm   - arm64, 4 CPU, 16 GB RAM
         config:
-          # ===== TEST: Linux ARM64 native (ubuntu-22.04-arm-16core) =====
-          - os: ubuntu-22.04-arm-16core
+          # ===== TEST: Linux ARM64 native (ubuntu-22.04-arm, free) =====
+          - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             variant: debug
             features: none
-          - os: ubuntu-22.04-arm-16core
+          - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             variant: debug
             features: ptrcomp
