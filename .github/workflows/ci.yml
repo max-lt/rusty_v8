@@ -45,99 +45,15 @@ jobs:
         #   windows-2025     - x64, 4 CPU, 16 GB RAM
         #   windows-11-arm   - arm64, 4 CPU, 16 GB RAM
         config:
-          # ===== macOS ARM64 (main target: none, ptrcomp, sandbox) =====
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: debug
-            features: none
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            features: none
-          - os: macos-15-xlarge
-            target: aarch64-apple-darwin
-            variant: debug
-            features: ptrcomp
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            features: ptrcomp
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: debug
-            features: sandbox
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            features: sandbox
-
-          # ===== Linux x86_64 (main target: none, ptrcomp, sandbox) =====
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: debug
-            features: none
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: release
-            features: none
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: debug
-            features: ptrcomp
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: release
-            features: ptrcomp
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: debug
-            features: sandbox
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: release
-            features: sandbox
-
-          # ===== Linux ARM64 cross-compile (main target: none, ptrcomp, sandbox) =====
-          - os: ubuntu-22.04
+          # ===== TEST: Linux ARM64 native (ubuntu-22.04-arm-16core) =====
+          - os: ubuntu-22.04-arm-16core
             target: aarch64-unknown-linux-gnu
             variant: debug
             features: none
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: release
-            features: none
-          - os: ubuntu-22.04
+          - os: ubuntu-22.04-arm-16core
             target: aarch64-unknown-linux-gnu
             variant: debug
             features: ptrcomp
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: release
-            features: ptrcomp
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: debug
-            features: sandbox
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: release
-            features: sandbox
-
-          # ===== macOS x86_64 (secondary: none only) =====
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
-            variant: debug
-            features: none
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
-            variant: release
-            features: none
-
-          # ===== Windows x86_64 (secondary: none only, release only) =====
-          - os: windows-2022
-            target: x86_64-pc-windows-msvc
-            variant: release
-            features: none
 
     env:
       V8_FROM_SOURCE: true
@@ -169,10 +85,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: 3.11.x
-          architecture: x64
+          architecture: ${{ contains(matrix.config.os, 'arm') && 'arm64' || 'x64' }}
 
       - name: Install cross compilation toolchain
-        if: matrix.config.target == 'aarch64-unknown-linux-gnu'
+        if: matrix.config.target == 'aarch64-unknown-linux-gnu' && !contains(matrix.config.os, 'arm')
         run: |
           rustup target add aarch64-unknown-linux-gnu
 
