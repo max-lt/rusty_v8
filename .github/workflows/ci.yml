@@ -12,21 +12,38 @@ permissions: write-all
 
 jobs:
   build:
-    name: ${{ matrix.config.variant }} ${{ matrix.config.target }} ${{ matrix.config.features }}
+    name:
+      ${{ matrix.config.variant }} ${{ matrix.config.target }} ${{
+      matrix.config.features }}
     runs-on: ${{ matrix.config.os }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         # ===== Runner sizes reference =====
+        # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+        # https://docs.github.com/en/actions/reference/runners/larger-runners
+        # https://docs.github.com/en/billing/reference/actions-runner-pricing
         # macOS (free):
-        #   macos-15         - ARM64 (M1), 3 CPU, 7 GB RAM
+        #   macos-15         - arm64 (M1), 3 CPU, 7 GB RAM
         #   macos-15-intel   - Intel x64, 4 CPU, 14 GB RAM
         # macOS (paid):
         #   macos-15-large   - Intel x64, 12 CPU, 30 GB RAM
-        #   macos-15-xlarge  - ARM64 (M2), 5 CPU, 14 GB RAM
+        #   macos-15-xlarge  - arm64 (M2), 5 CPU, 14 GB RAM
         # Linux (free):
         #   ubuntu-22.04     - x64, 4 CPU, 16 GB RAM
+        #   ubuntu-24.04     - x64, 4 CPU, 16 GB RAM
+        #   ubuntu-22.04-arm - arm64, 4 CPU, 16 GB RAM
+        #   ubuntu-24.04-arm - arm64, 4 CPU, 16 GB RAM
+        # Linux (paid):
+        #   ubuntu-22.04-8core  - x64, 8 CPU, 32 GB RAM
+        #   ubuntu-22.04-arm-8core - arm64, 8 CPU, 32 GB RAM
+        #   ubuntu-22.04-16core - x64, 16 CPU, 64 GB RAM
+        #   ubuntu-22.04-arm-16core - arm64, 16 CPU, 64 GB RAM
+        # Windows (free):
+        #   windows-2022     - x64, 4 CPU, 16 GB RAM
+        #   windows-2025     - x64, 4 CPU, 16 GB RAM
+        #   windows-11-arm   - arm64, 4 CPU, 16 GB RAM
         config:
           # ===== macOS ARM64 (main target: none, ptrcomp, sandbox) =====
           - os: macos-15
@@ -124,8 +141,11 @@ jobs:
 
     env:
       V8_FROM_SOURCE: true
-      CARGO_VARIANT_FLAG: ${{ matrix.config.variant == 'release' && '--release' || '' }}
-      LIB_NAME: ${{ contains(matrix.config.target, 'windows') && 'rusty_v8' || 'librusty_v8' }}
+      CARGO_VARIANT_FLAG:
+        ${{ matrix.config.variant == 'release' && '--release' || '' }}
+      LIB_NAME:
+        ${{ contains(matrix.config.target, 'windows') && 'rusty_v8' ||
+        'librusty_v8' }}
       LIB_EXT: ${{ contains(matrix.config.target, 'windows') && 'lib' || 'a' }}
       RUSTFLAGS: -D warnings
 
@@ -179,8 +199,13 @@ jobs:
             target/*/.*
             target/*/build
             target/*/deps
-          key: cargo-${{ matrix.config.target }}-${{ matrix.config.variant }}-${{ matrix.config.features }}-${{ hashFiles('Cargo.lock', 'build.rs', 'git_submodule_status.txt') }}
-          restore-keys: cargo-${{ matrix.config.target }}-${{ matrix.config.variant }}-${{ matrix.config.features }}-
+          key:
+            cargo-${{ matrix.config.target }}-${{ matrix.config.variant }}-${{
+            matrix.config.features }}-${{ hashFiles('Cargo.lock', 'build.rs',
+            'git_submodule_status.txt') }}
+          restore-keys:
+            cargo-${{ matrix.config.target }}-${{ matrix.config.variant }}-${{
+            matrix.config.features }}-
 
       - name: Install and start sccache
         shell: pwsh
@@ -233,16 +258,24 @@ jobs:
         if: matrix.config.target != 'aarch64-unknown-linux-gnu'
         env:
           SCCACHE_IDLE_TIMEOUT: 0
-        run: cargo nextest run --all-targets --locked --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }}
+        run:
+          cargo nextest run --all-targets --locked --target ${{
+          matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{
+          env.CARGO_FEATURE_FLAGS }}
 
       - name: Build (cross-compile, no tests)
         if: matrix.config.target == 'aarch64-unknown-linux-gnu'
         env:
           SCCACHE_IDLE_TIMEOUT: 0
-        run: cargo build --all-targets --locked --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }}
+        run:
+          cargo build --all-targets --locked --target ${{ matrix.config.target
+          }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }}
 
       - name: Clippy
-        run: cargo clippy --all-targets --locked --target ${{ matrix.config.target }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }} -- -D clippy::all
+        run:
+          cargo clippy --all-targets --locked --target ${{ matrix.config.target
+          }} ${{ env.CARGO_VARIANT_FLAG }} ${{ env.CARGO_FEATURE_FLAGS }} -- -D
+          clippy::all
 
       - name: Prepare binary publish
         run: |
@@ -255,9 +288,8 @@ jobs:
       - name: Binary publish
         uses: softprops/action-gh-release@v0.1.15
         if: >-
-          github.repository == 'max-lt/rusty_v8' &&
-          startsWith(github.ref, 'refs/tags/v') &&
-          !contains(github.ref, '-')
+          github.repository == 'max-lt/rusty_v8' && startsWith(github.ref,
+          'refs/tags/v') && !contains(github.ref, '-')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -268,13 +300,19 @@ jobs:
       - name: Upload CI artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
-          path: target/src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant }}_${{ matrix.config.target }}.rs
+          name:
+            src_binding${{ env.FEATURES_SUFFIX }}_${{ matrix.config.variant
+            }}_${{ matrix.config.target }}.rs
+          path:
+            target/src_binding${{ env.FEATURES_SUFFIX }}_${{
+            matrix.config.variant }}_${{ matrix.config.target }}.rs
 
   publish:
     needs: build
     runs-on: ubuntu-22.04
-    if: github.repository == 'max-lt/rusty_v8' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
+    if:
+      github.repository == 'max-lt/rusty_v8' && startsWith(github.ref,
+      'refs/tags/v') && !contains(github.ref, '-')
     steps:
       - name: Configure git
         run: git config --global core.symlinks true
