@@ -799,6 +799,12 @@ fn print_link_flags() {
     println!("cargo:rustc-link-lib=dylib=dbghelp");
   }
 
+  // macOS + sandbox requires CoreFoundation for partition_alloc's UseMapJit()
+  if target_os == "macos" && env::var("CARGO_FEATURE_V8_ENABLE_SANDBOX").is_ok()
+  {
+    println!("cargo:rustc-link-lib=framework=CoreFoundation");
+  }
+
   if target_env == "msvc" {
     // On Windows, including libcpmt[d]/msvcprt[d] explicitly links the C++
     // standard library, which libc++ needs for exception_ptr internals.

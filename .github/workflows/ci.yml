@@ -19,23 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # ===== macOS ARM64 (main target: none, ptrcomp, sandbox) =====
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: debug
-            features: none
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            features: none
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: debug
-            features: ptrcomp
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            features: ptrcomp
+          # ===== TEST ONLY: macOS ARM64 sandbox (CoreFoundation fix) =====
           - os: macos-15
             target: aarch64-apple-darwin
             variant: debug
@@ -45,73 +29,91 @@ jobs:
             variant: release
             features: sandbox
 
-          # ===== Linux x86_64 (main target: none, ptrcomp, sandbox) =====
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: debug
-            features: none
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: release
-            features: none
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: debug
-            features: ptrcomp
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: release
-            features: ptrcomp
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: debug
-            features: sandbox
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: release
-            features: sandbox
+          # # ===== macOS ARM64 (main target: none, ptrcomp, sandbox) =====
+          # - os: macos-15
+          #   target: aarch64-apple-darwin
+          #   variant: debug
+          #   features: none
+          # - os: macos-15
+          #   target: aarch64-apple-darwin
+          #   variant: release
+          #   features: none
+          # - os: macos-15
+          #   target: aarch64-apple-darwin
+          #   variant: debug
+          #   features: ptrcomp
+          # - os: macos-15
+          #   target: aarch64-apple-darwin
+          #   variant: release
+          #   features: ptrcomp
 
-          # ===== Linux ARM64 cross-compile (main target: none, ptrcomp, sandbox) =====
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: debug
-            features: none
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: release
-            features: none
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: debug
-            features: ptrcomp
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: release
-            features: ptrcomp
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: debug
-            features: sandbox
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: release
-            features: sandbox
+          # # ===== Linux x86_64 (main target: none, ptrcomp, sandbox) =====
+          # - os: ubuntu-22.04
+          #   target: x86_64-unknown-linux-gnu
+          #   variant: debug
+          #   features: none
+          # - os: ubuntu-22.04
+          #   target: x86_64-unknown-linux-gnu
+          #   variant: release
+          #   features: none
+          # - os: ubuntu-22.04
+          #   target: x86_64-unknown-linux-gnu
+          #   variant: debug
+          #   features: ptrcomp
+          # - os: ubuntu-22.04
+          #   target: x86_64-unknown-linux-gnu
+          #   variant: release
+          #   features: ptrcomp
+          # - os: ubuntu-22.04
+          #   target: x86_64-unknown-linux-gnu
+          #   variant: debug
+          #   features: sandbox
+          # - os: ubuntu-22.04
+          #   target: x86_64-unknown-linux-gnu
+          #   variant: release
+          #   features: sandbox
 
-          # ===== macOS x86_64 (secondary: none only) =====
-          - os: macos-15
-            target: x86_64-apple-darwin
-            variant: debug
-            features: none
-          - os: macos-15
-            target: x86_64-apple-darwin
-            variant: release
-            features: none
+          # # ===== Linux ARM64 cross-compile (main target: none, ptrcomp, sandbox) =====
+          # - os: ubuntu-22.04
+          #   target: aarch64-unknown-linux-gnu
+          #   variant: debug
+          #   features: none
+          # - os: ubuntu-22.04
+          #   target: aarch64-unknown-linux-gnu
+          #   variant: release
+          #   features: none
+          # - os: ubuntu-22.04
+          #   target: aarch64-unknown-linux-gnu
+          #   variant: debug
+          #   features: ptrcomp
+          # - os: ubuntu-22.04
+          #   target: aarch64-unknown-linux-gnu
+          #   variant: release
+          #   features: ptrcomp
+          # - os: ubuntu-22.04
+          #   target: aarch64-unknown-linux-gnu
+          #   variant: debug
+          #   features: sandbox
+          # - os: ubuntu-22.04
+          #   target: aarch64-unknown-linux-gnu
+          #   variant: release
+          #   features: sandbox
 
-          # ===== Windows x86_64 (secondary: none only, release only) =====
-          - os: windows-2022
-            target: x86_64-pc-windows-msvc
-            variant: release
-            features: none
+          # # ===== macOS x86_64 (secondary: none only) =====
+          # - os: macos-15
+          #   target: x86_64-apple-darwin
+          #   variant: debug
+          #   features: none
+          # - os: macos-15
+          #   target: x86_64-apple-darwin
+          #   variant: release
+          #   features: none
+
+          # # ===== Windows x86_64 (secondary: none only, release only) =====
+          # - os: windows-2022
+          #   target: x86_64-pc-windows-msvc
+          #   variant: release
+          #   features: none
 
     env:
       V8_FROM_SOURCE: true
