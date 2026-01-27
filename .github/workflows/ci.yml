@@ -18,6 +18,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # ===== Runner sizes reference =====
+        # macOS (free):
+        #   macos-15         - ARM64 (M1), 3 CPU, 7 GB RAM
+        #   macos-15-intel   - Intel x64, 4 CPU, 14 GB RAM
+        # macOS (paid):
+        #   macos-15-large   - Intel x64, 12 CPU, 30 GB RAM
+        #   macos-15-xlarge  - ARM64 (M2), 5 CPU, 14 GB RAM
+        # Linux (free):
+        #   ubuntu-22.04     - x64, 4 CPU, 16 GB RAM
         config:
           # ===== macOS ARM64 (main target: none, ptrcomp, sandbox) =====
           - os: macos-15
@@ -28,7 +37,7 @@ jobs:
             target: aarch64-apple-darwin
             variant: release
             features: none
-          - os: macos-15
+          - os: macos-15-xlarge
             target: aarch64-apple-darwin
             variant: debug
             features: ptrcomp
@@ -98,11 +107,11 @@ jobs:
             features: sandbox
 
           # ===== macOS x86_64 (secondary: none only) =====
-          - os: macos-15
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             variant: debug
             features: none
-          - os: macos-15
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             variant: release
             features: none
