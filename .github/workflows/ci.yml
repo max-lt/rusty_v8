@@ -129,13 +129,16 @@ jobs:
           SCCACHE_DIR: ${{ github.workspace }}/target/sccache
           SCCACHE_CACHE_SIZE: 256M
           SCCACHE_IDLE_TIMEOUT: 0
+          RUNNER_OS_ARM: ${{ contains(matrix.config.os, 'arm') }}
         run: |
           $version = "v0.8.2"
+          # For Linux ARM runners, use ARM64 sccache; for cross-compile use x86_64
+          $linuxMusl = if ($env:RUNNER_OS_ARM -eq 'true') { "aarch64-unknown-linux-musl" } else { "x86_64-unknown-linux-musl" }
           $platform =
             @{ "x86_64-apple-darwin"       = "x86_64-apple-darwin"
                "aarch64-apple-darwin"      = "aarch64-apple-darwin"
                "x86_64-unknown-linux-gnu"  = "x86_64-unknown-linux-musl"
-               "aarch64-unknown-linux-gnu" = "x86_64-unknown-linux-musl"
+               "aarch64-unknown-linux-gnu" = $linuxMusl
                "x86_64-pc-windows-msvc"    = "x86_64-pc-windows-msvc"
              }['${{ matrix.config.target }}']
           $basename = "sccache-$version-$platform"
