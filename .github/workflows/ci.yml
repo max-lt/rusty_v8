@@ -77,11 +77,8 @@ jobs:
       - name: Install rust
         uses: dsherret/rust-toolchain-file@v1
 
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-
       - name: Install nextest
-        run: cargo binstall cargo-nextest -y --secure
+        uses: taiki-e/install-action@nextest
 
       - name: Install python
         uses: actions/setup-python@v5
