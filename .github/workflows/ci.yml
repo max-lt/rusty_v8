@@ -19,12 +19,12 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # ===== TEST ONLY: macOS ARM64 sandbox (CoreFoundation fix) =====
-          - os: macos-15
+          # ===== TEST ONLY: macOS ARM64 sandbox (CoreFoundation + Security fix) =====
+          - os: macos-15-xlarge
             target: aarch64-apple-darwin
             variant: debug
             features: sandbox
-          - os: macos-15
+          - os: macos-15-xlarge
             target: aarch64-apple-darwin
             variant: release
             features: sandbox
