@@ -16,12 +16,24 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # ===== SANDBOX BUILDS (test new feature) =====
-          # Sandbox requires pointer compression
+          # ===== macOS ARM64 =====
+          - os: macos-15
+            target: aarch64-apple-darwin
+            variant: release
+            features: none
+            cargo: cargo
+
           - os: macos-15
             target: aarch64-apple-darwin
             variant: release
             features: sandbox
+            cargo: cargo
+
+          # ===== Linux x86_64 =====
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            variant: release
+            features: none
             cargo: cargo
 
           - os: ubuntu-22.04
@@ -30,45 +42,17 @@ jobs:
             features: sandbox
             cargo: cargo
 
-          # ===== POINTER COMPRESSION BUILDS =====
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            features: ptrcomp
-            cargo: cargo
-
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            variant: release
-            features: ptrcomp
-            cargo: cargo
-
-          # ===== LINUX ARM64 (cross-compile) =====
-          # Test sandbox on ARM64 Linux (may segfault due to partition_alloc)
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            variant: release
-            features: sandbox
-            cargo: cargo
-
-          # Baseline without ptrcomp (known to work)
+          # ===== Linux ARM64 (cross-compile) =====
           - os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
             variant: release
             features: none
             cargo: cargo
 
-          # ===== NO FEATURES (baseline) =====
-          - os: macos-15
-            target: aarch64-apple-darwin
-            variant: release
-            features: none
-            cargo: cargo
-
           - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
+            target: aarch64-unknown-linux-gnu
             variant: release
-            features: none
+            features: sandbox
             cargo: cargo
 
     env:
@@ -76,8 +60,9 @@ jobs:
       LIB_NAME: librusty_v8
       LIB_EXT: a
       RUSTFLAGS: -D warnings
-      CARGO_FEATURE_FLAGS: ${{ matrix.config.features == 'sandbox' && '--features v8_enable_sandbox' || (matrix.config.features == 'ptrcomp' && '--features v8_enable_pointer_compression' || '') }}
-      FEATURES_SUFFIX: ${{ matrix.config.features == 'sandbox' && '_sandbox' || (matrix.config.features == 'ptrcomp' && '_ptrcomp' || '') }}
+      # Sandbox implies pointer compression (v8_enable_sandbox feature depends on v8_enable_pointer_compression)
+      CARGO_FEATURE_FLAGS: ${{ matrix.config.features == 'sandbox' && '--features v8_enable_sandbox' || '' }}
+      FEATURES_SUFFIX: ${{ matrix.config.features == 'sandbox' && '_sandbox' || '' }}
 
     steps:
       - name: Configure git
@@ -91,6 +76,12 @@ jobs:
 
       - name: Install rust
         uses: dsherret/rust-toolchain-file@v1
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install nextest
+        run: cargo binstall cargo-nextest --secure
 
       - name: Install python
         uses: actions/setup-python@v5
@@ -163,13 +154,13 @@ jobs:
       - name: Build
         env:
           SCCACHE_IDLE_TIMEOUT: 0
-        run: ${{ matrix.config.cargo }} build --${{ matrix.config.variant }} ${{ env.CARGO_FEATURE_FLAGS }} --locked --target ${{ matrix.config.target }}
+        run: ${{ matrix.config.cargo }} build --release ${{ env.CARGO_FEATURE_FLAGS }} --locked --target ${{ matrix.config.target }}
 
       - name: Test
         if: matrix.config.target != 'aarch64-unknown-linux-gnu'
         env:
           SCCACHE_IDLE_TIMEOUT: 0
-        run: ${{ matrix.config.cargo }} test --${{ matrix.config.variant }} ${{ env.CARGO_FEATURE_FLAGS }} --locked --target ${{ matrix.config.target }}
+        run: ${{ matrix.config.cargo }} nextest run --release ${{ env.CARGO_FEATURE_FLAGS }} --locked --target ${{ matrix.config.target }}
 
       - name: Prepare binary publish
         run: |
