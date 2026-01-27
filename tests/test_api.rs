@@ -11549,7 +11549,11 @@ fn gc_callbacks() {
   }
 }
 
+// Fast API calls with External pointers don't work with V8 sandbox mode.
+// The sandbox's External Pointer Table (EPT) isn't compatible with the fast API path
+// for pointer types. See: https://v8.dev/blog/sandbox
 #[test]
+#[cfg(not(feature = "v8_enable_sandbox"))]
 fn test_fast_calls_pointer() {
   static WHO: AtomicUsize = AtomicUsize::new(0);
 
