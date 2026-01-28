@@ -134,6 +134,7 @@ which = "6"
 home = "0"
 rustversion = "1"
 bindgen = "0.72"
+serial_test = "3"
 
 [[example]]
 name = "hello_world"

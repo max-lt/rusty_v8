@@ -2,10 +2,12 @@
 // but otherwise works fine on real device.
 #![cfg(not(target_arch = "aarch64"))]
 
+use serial_test::serial;
 use std::iter::repeat_with;
 use std::thread;
 
 #[test]
+#[serial]
 fn concurrent_isolate_creation_and_disposal() {
   let platform = v8::new_default_platform(0, false).make_shared();
   v8::V8::initialize_platform(platform);
