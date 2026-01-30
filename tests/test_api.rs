@@ -1,4 +1,5 @@
 // Copyright 2019-2021 the Deno authors. All rights reserved. MIT license.
+use parking_lot::Mutex;
 use std::any::type_name;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -15,7 +16,6 @@ use std::ptr::addr_of_mut;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::LazyLock;
-use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use v8::AccessorConfiguration;
 use v8::fast_api;

@@ -1,7 +1,7 @@
 // Copyright 2019-2021 the Deno authors. All rights reserved. MIT license.
+use parking_lot::Mutex;
 use std::ffi::CStr;
 use std::ffi::CString;
-use parking_lot::Mutex;
 use std::vec::Vec;
 
 use crate::platform::Platform;
