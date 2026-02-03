@@ -1,6 +1,6 @@
 [package]
 name = "openworkers-v8"
-version = "145.0.1"
+version = "145.0.1-pkru"
 description = "Rust bindings to V8 (fork with Locker/UnenteredIsolate support for isolate pooling)"
 readme = "README.md"
 authors = ["the Deno authors", "OpenWorkers Authors <contact@openworkers.dev>"]
@@ -115,6 +115,9 @@ bitflags = "2.5"
 parking_lot = "0.12"
 paste = "1.0"
 temporal_capi = { version = "0.1.2", features = ["zoneinfo64"] }
+
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+libc = "0.2"
 
 [build-dependencies]
 miniz_oxide = "0.8.8"

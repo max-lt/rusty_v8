@@ -903,6 +903,11 @@ impl Isolate {
 
   fn new_impl(params: CreateParams) -> *mut RealIsolate {
     crate::V8::assert_initialized();
+
+    // Normalize PKRU before creating isolate (Linux x86_64 only).
+    // This ensures threads creating new isolates have correct memory protection key permissions.
+    let _pkru_guard = crate::pku::PkruGuard::new();
+
     let (raw_create_params, create_param_allocations) = params.finalize();
     let cxx_isolate = unsafe { v8__Isolate__New(&raw_create_params) };
     let mut isolate = unsafe { Isolate::from_raw_ptr(cxx_isolate) };
@@ -2543,6 +2548,10 @@ impl AsRef<Isolate> for Isolate {
 pub struct Locker<'a> {
   raw: std::mem::ManuallyDrop<crate::scope::raw::Locker>,
   isolate: &'a mut UnenteredIsolate,
+  /// PKRU guard to normalize memory protection keys on V8 entry.
+  /// On Linux x86_64, this saves the thread's PKRU and restores the V8 baseline.
+  /// On other platforms, this is a zero-sized no-op.
+  _pkru_guard: crate::pku::PkruGuard,
 }
 
 /// Guard to ensure `v8__Isolate__Exit` is called if panic occurs after Enter.
@@ -2568,6 +2577,10 @@ impl<'a> Locker<'a> {
   /// This function is panic-safe. If initialization fails, the isolate will be
   /// properly exited.
   pub fn new(isolate: &'a mut UnenteredIsolate) -> Self {
+    // Normalize PKRU before entering V8 (Linux x86_64 only).
+    // This ensures the thread has the correct memory protection key permissions.
+    let pkru_guard = crate::pku::PkruGuard::new();
+
     let isolate_ptr = isolate.cxx_isolate;
 
     // Enter the isolate first
@@ -2588,6 +2601,7 @@ impl<'a> Locker<'a> {
     Self {
       raw: std::mem::ManuallyDrop::new(raw),
       isolate,
+      _pkru_guard: pkru_guard,
     }
   }
 
