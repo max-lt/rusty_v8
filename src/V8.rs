@@ -207,6 +207,10 @@ pub fn initialize() {
     _ => panic!("Invalid global state"),
   };
   unsafe { v8__V8__Initialize() }
+
+  // Capture the PKRU baseline after V8 initialization.
+  // This is used by Locker to normalize PKRU for threads entering V8.
+  crate::pku::capture_baseline();
 }
 
 /// Sets the v8::Platform to use. This should be invoked before V8 is
